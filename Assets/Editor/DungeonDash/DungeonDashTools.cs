@@ -8,6 +8,7 @@ using UnityEditor.Animations;
 using UnityEditor.Tilemaps;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using DungeonDash;
 
 namespace DungeonDash.EditorTools
 {
@@ -27,6 +28,7 @@ namespace DungeonDash.EditorTools
         const string GenAnims = "Assets/Generated/Animations";
         const string GenCtrls = "Assets/Generated/Animators";
         const string PrefabDir = "Assets/Prefabs";
+        const string CatalogPath = "Assets/Resources/GameCatalog.asset";
 
         struct CharDef
         {
@@ -54,10 +56,77 @@ namespace DungeonDash.EditorTools
         {
             GenerateTiles();
             GenerateCharacters();
+            GenerateGameCatalog();
             if (!Application.isBatchMode)
                 EditorUtility.DisplayDialog("Dungeon Dash",
                     "Tiles + characters generated. Check the Console for details.", "OK");
         }
+
+        [MenuItem("Tools/Dungeon Dash/3. Generate Game Catalog", false, 22)]
+        public static void GenerateGameCatalog()
+        {
+            EnsureFolder("Assets/Resources");
+            var catalog = ScriptableObject.CreateInstance<GameCatalog>();
+
+            catalog.characters = Characters.Select(c => new GameCatalog.CharacterSkin
+            {
+                id = c.id,
+                idle = LoadCharacterFrames(c, "idle"),
+                run = LoadCharacterFrames(c, "run"),
+                speed = c.speed / 100f
+            }).ToArray();
+
+            catalog.enemies = AssetDatabase.GetSubFolders("Assets/Art/Enemies")
+                .OrderBy(x => x).Select(path =>
+                {
+                    var idle = LoadFrames(path, "_idle_anim_");
+                    var run = LoadFrames(path, "_run_anim_");
+                    return new GameCatalog.EnemySkin
+                    {
+                        id = Path.GetFileName(path),
+                        idle = idle,
+                        run = run.Length == 0 ? idle : run
+                    };
+                }).Where(x => x.idle.Length > 0).ToArray();
+
+            catalog.weapons = LoadSprites("Assets/Art/Weapons")
+                .Select(sprite => new GameCatalog.NamedSprite { id = sprite.name, sprite = sprite }).ToArray();
+
+            var tiles = LoadSprites(ArtTiles);
+            catalog.floors = tiles.Where(x => x.name.StartsWith("floor_")).ToArray();
+            catalog.walls = tiles.Where(x => x.name.StartsWith("wall_") || x.name.StartsWith("column")).ToArray();
+            catalog.coins = LoadSprites("Assets/Art/Items/coin");
+            catalog.potions = LoadSprites("Assets/Art/Items/potion");
+            catalog.chests = LoadSprites("Assets/Art/Items/chest");
+            catalog.bombs = LoadSprites("Assets/Art/Items/bomb");
+            catalog.heartFull = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/UI/hearts/ui_heart_full.png");
+            catalog.heartHalf = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/UI/hearts/ui_heart_half.png");
+            catalog.heartEmpty = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/UI/hearts/ui_heart_empty.png");
+            catalog.buttonUp = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/UI/button/button_blue_up.png");
+            catalog.buttonDown = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/UI/button/button_blue_down.png");
+
+            CreateOrReplace(catalog, CatalogPath);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log($"[DungeonDash] Game catalog: {catalog.characters.Length} heroes, " +
+                      $"{catalog.enemies.Length} enemies, {catalog.weapons.Length} artifacts.");
+        }
+
+        static Sprite[] LoadFrames(string folder, string marker) => LoadSprites(folder)
+            .Where(x => x.name.Contains(marker)).OrderBy(x => x.name).ToArray();
+
+        static Sprite[] LoadCharacterFrames(CharDef character, string animation) =>
+            LoadSprites($"{ArtChars}/{character.id}")
+                .Where(x => x.name.StartsWith($"{character.prefix}_{animation}_anim_"))
+                .OrderBy(x => x.name).ToArray();
+
+        static Sprite[] LoadSprites(string folder) => AssetDatabase.FindAssets("t:Sprite", new[] { folder })
+            .Select(AssetDatabase.GUIDToAssetPath)
+            .Distinct()
+            .Select(AssetDatabase.LoadAssetAtPath<Sprite>)
+            .Where(x => x != null)
+            .OrderBy(x => x.name)
+            .ToArray();
 
         // ----------------------------------------------------------------- TILES
 
@@ -323,8 +392,7 @@ namespace DungeonDash.EditorTools
             var anim = go.AddComponent<Animator>();
             anim.runtimeAnimatorController = controller;
 
-            var pc = go.AddComponent<PlayerController>();
-            pc.moveSpeed = def.speed / 100f;
+            go.AddComponent<PlayerController>();
 
             PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
             UnityEngine.Object.DestroyImmediate(go);
