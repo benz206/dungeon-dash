@@ -68,18 +68,21 @@ namespace DungeonDash.EditorTools
             EnsureFolder("Assets/Resources");
             var catalog = ScriptableObject.CreateInstance<GameCatalog>();
 
-            catalog.characters = Characters.Select(c => new GameCatalog.CharacterSkin
-            {
-                id = c.id,
-                idle = LoadCharacterFrames(c, "idle"),
-                run = LoadCharacterFrames(c, "run"),
-                speed = c.speed / 100f
-            }).ToArray();
+            catalog.characters = Characters.SelectMany(c => CharacterPrefixes(c).Select(prefix =>
+                new GameCatalog.CharacterSkin
+                {
+                    id = prefix == c.prefix ? c.id : prefix,
+                    idle = LoadCharacterFrames(c.id, prefix, "idle"),
+                    run = LoadCharacterFrames(c.id, prefix, "run"),
+                    hit = LoadCharacterFrames(c.id, prefix, "hit"),
+                    speed = c.speed / 100f
+                })).ToArray();
 
             catalog.enemies = AssetDatabase.GetSubFolders("Assets/Art/Enemies")
                 .OrderBy(x => x).Select(path =>
                 {
                     var idle = LoadFrames(path, "_idle_anim_");
+                    if (idle.Length == 0) idle = LoadSprites(path);
                     var run = LoadFrames(path, "_run_anim_");
                     return new GameCatalog.EnemySkin
                     {
@@ -94,7 +97,7 @@ namespace DungeonDash.EditorTools
 
             var tiles = LoadSprites(ArtTiles);
             catalog.floors = tiles.Where(x => x.name.StartsWith("floor_")).ToArray();
-            catalog.walls = tiles.Where(x => x.name.StartsWith("wall_") || x.name.StartsWith("column")).ToArray();
+            catalog.walls = tiles.Where(x => !x.name.StartsWith("floor_")).ToArray();
             catalog.coins = LoadSprites("Assets/Art/Items/coin");
             catalog.potions = LoadSprites("Assets/Art/Items/potion");
             catalog.chests = LoadSprites("Assets/Art/Items/chest");
@@ -104,6 +107,8 @@ namespace DungeonDash.EditorTools
             catalog.heartEmpty = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/UI/hearts/ui_heart_empty.png");
             catalog.buttonUp = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/UI/button/button_blue_up.png");
             catalog.buttonDown = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/UI/button/button_blue_down.png");
+            catalog.dangerButtonUp = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/UI/button/button_red_up.png");
+            catalog.dangerButtonDown = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/UI/button/button_red_down.png");
 
             CreateOrReplace(catalog, CatalogPath);
             AssetDatabase.SaveAssets();
@@ -115,9 +120,15 @@ namespace DungeonDash.EditorTools
         static Sprite[] LoadFrames(string folder, string marker) => LoadSprites(folder)
             .Where(x => x.name.Contains(marker)).OrderBy(x => x.name).ToArray();
 
-        static Sprite[] LoadCharacterFrames(CharDef character, string animation) =>
+        static string[] CharacterPrefixes(CharDef character) =>
             LoadSprites($"{ArtChars}/{character.id}")
-                .Where(x => x.name.StartsWith($"{character.prefix}_{animation}_anim_"))
+                .Select(x => Regex.Match(x.name, @"^(.*)_idle_anim_f\d+$"))
+                .Where(x => x.Success).Select(x => x.Groups[1].Value)
+                .Distinct().OrderBy(x => x).ToArray();
+
+        static Sprite[] LoadCharacterFrames(string folder, string prefix, string animation) =>
+            LoadSprites($"{ArtChars}/{folder}")
+                .Where(x => x.name.StartsWith($"{prefix}_{animation}_anim_"))
                 .OrderBy(x => x.name).ToArray();
 
         static Sprite[] LoadSprites(string folder) => AssetDatabase.FindAssets("t:Sprite", new[] { folder })

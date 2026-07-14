@@ -36,6 +36,7 @@ namespace DungeonDash
         GUIStyle _labelStyle;
         GUIStyle _smallStyle;
         GUIStyle _buttonStyle;
+        GUIStyle _dangerButtonStyle;
         GUIStyle _boxStyle;
 
         public bool AcceptsGameplayInput => !_choosingCharacter && !_gameOver && !_inventoryOpen && !_marketOpen;
@@ -214,7 +215,8 @@ namespace DungeonDash
             _kills++;
             _save.coins += 1 + _wave / 3;
             if (_kills % 3 == 0) DropArtifact(enemy.transform.position);
-            else if (_random.NextDouble() < 0.18d) DropPickup(enemy.transform.position, PickupKind.Potion);
+            else if (_random.NextDouble() < 0.14d) DropPickup(enemy.transform.position, PickupKind.Potion);
+            else if (_random.NextDouble() < 0.12d) DropPickup(enemy.transform.position, PickupKind.Bomb);
             else if (_random.NextDouble() < 0.35d) DropPickup(enemy.transform.position, PickupKind.Coin);
 
             if (_enemies.Count == 0 && !_wavePending)
@@ -248,6 +250,7 @@ namespace DungeonDash
             {
                 PickupKind.Coin => _catalog.coins,
                 PickupKind.Potion => _catalog.potions,
+                PickupKind.Bomb => _catalog.bombs,
                 _ => _catalog.chests
             };
             var go = CreateSprite(kind.ToString(), sprites[0], position, 7);
@@ -269,6 +272,16 @@ namespace DungeonDash
                 case PickupKind.Chest:
                     _save.coins += 8 + _wave;
                     Toast($"Chest: +{8 + _wave} coins");
+                    break;
+                case PickupKind.Bomb:
+                    int hit = 0;
+                    foreach (var enemy in _enemies.ToArray())
+                    {
+                        if (enemy == null || ((Vector2)enemy.transform.position - PlayerPosition).sqrMagnitude > 16f) continue;
+                        enemy.TakeDamage(12 + _wave * 2);
+                        hit++;
+                    }
+                    Toast($"Bomb blast hit {hit} enemies");
                     break;
                 case PickupKind.Artifact:
                     _save.inventory.Add(artifact);
@@ -358,6 +371,11 @@ namespace DungeonDash
             _labelStyle.normal.textColor = Color.white;
             _smallStyle = new GUIStyle(_labelStyle) { fontSize = 14 };
             _buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 16, fixedHeight = 38 };
+            _buttonStyle.normal.background = _catalog.buttonUp.texture;
+            _buttonStyle.active.background = _catalog.buttonDown.texture;
+            _dangerButtonStyle = new GUIStyle(_buttonStyle);
+            _dangerButtonStyle.normal.background = _catalog.dangerButtonUp.texture;
+            _dangerButtonStyle.active.background = _catalog.dangerButtonDown.texture;
             _boxStyle = new GUIStyle(GUI.skin.box);
             _boxStyle.normal.background = Texture2D.whiteTexture;
         }
@@ -384,30 +402,37 @@ namespace DungeonDash
 
         void DrawHearts(Rect start)
         {
-            for (int i = 0; i < _player.MaxHealth; i++)
+            for (int i = 0; i < _player.MaxHealth / 2; i++)
             {
-                var sprite = i < _player.Health ? _catalog.heartFull : _catalog.heartEmpty;
+                int health = _player.Health - i * 2;
+                var sprite = health >= 2 ? _catalog.heartFull : health == 1 ? _catalog.heartHalf : _catalog.heartEmpty;
                 GUI.DrawTexture(new Rect(start.x + i * 28, start.y, 24, 24), sprite.texture, ScaleMode.ScaleToFit, true);
             }
         }
 
         void DrawCharacterPicker()
         {
-            var rect = Centered(920, 430);
+            var rect = Centered(920, 650);
             Panel(rect);
             GUILayout.BeginArea(new Rect(rect.x + 28, rect.y + 24, rect.width - 56, rect.height - 48));
             GUILayout.Label("DUNGEON DASH", _titleStyle);
             GUILayout.Label("Choose your hero", _labelStyle);
             GUILayout.Space(18);
             GUILayout.BeginHorizontal();
-            foreach (var skin in _catalog.characters)
+            for (int i = 0; i < _catalog.characters.Length; i++)
             {
+                var skin = _catalog.characters[i];
                 GUILayout.BeginVertical(GUILayout.Width(130));
                 GUILayout.Label(new GUIContent(skin.idle[0].texture), GUILayout.Width(96), GUILayout.Height(120));
                 if (GUILayout.Button(Pretty(skin.id), _buttonStyle)) StartRun(skin);
                 GUILayout.Label($"Speed {skin.speed:0.0}", _smallStyle);
                 GUILayout.EndVertical();
                 GUILayout.Space(10);
+                if ((i + 1) % 6 == 0 && i + 1 < _catalog.characters.Length)
+                {
+                    GUILayout.EndHorizontal();
+                    GUILayout.BeginHorizontal();
+                }
             }
             GUILayout.EndHorizontal();
             GUILayout.FlexibleSpace();
@@ -486,7 +511,7 @@ namespace DungeonDash
             GUILayout.Label("RUN ENDED", _titleStyle);
             GUILayout.Label($"Reached wave {_wave} with {_kills} kills.\nArtifacts and coins are saved.", _labelStyle);
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Choose Hero & Run Again", _buttonStyle)) Restart();
+            if (GUILayout.Button("Choose Hero & Run Again", _dangerButtonStyle)) Restart();
             GUILayout.EndArea();
         }
 
@@ -536,10 +561,14 @@ namespace DungeonDash
         static Rect Centered(float width, float height) =>
             new((Screen.width - width) / 2f, (Screen.height - height) / 2f, width, height);
 
-        static string Pretty(string value) => char.ToUpperInvariant(value[0]) + value.Substring(1);
+        static string Pretty(string value)
+        {
+            value = value.Replace('_', ' ');
+            return char.ToUpperInvariant(value[0]) + value.Substring(1);
+        }
     }
 
-    public enum PickupKind { Coin, Potion, Chest, Artifact }
+    public enum PickupKind { Coin, Potion, Chest, Bomb, Artifact }
 
     public sealed class EnemyActor : MonoBehaviour
     {

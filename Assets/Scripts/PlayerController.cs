@@ -15,6 +15,7 @@ namespace DungeonDash
         Vector2 _aim = Vector2.right;
         float _nextAttack;
         float _invulnerableUntil;
+        float _hitUntil;
         float _animationTime;
 
         public int Health { get; private set; } = 10;
@@ -100,7 +101,9 @@ namespace DungeonDash
         {
             if (_renderer == null || _skin == null) return;
             _animationTime += Time.deltaTime;
-            var frames = _move.sqrMagnitude > 0.01f ? _skin.run : _skin.idle;
+            var frames = Time.time < _hitUntil && _skin.hit.Length > 0
+                ? _skin.hit
+                : _move.sqrMagnitude > 0.01f ? _skin.run : _skin.idle;
             if (frames != null && frames.Length > 0)
                 _renderer.sprite = frames[Mathf.FloorToInt(_animationTime * 10f) % frames.Length];
         }
@@ -109,6 +112,7 @@ namespace DungeonDash
         {
             if (Time.time < _invulnerableUntil || !_game.AcceptsGameplayInput) return;
             _invulnerableUntil = Time.time + 0.65f;
+            _hitUntil = Time.time + 0.2f;
             Health = Mathf.Max(0, Health - amount);
             if (Health == 0) _game.GameOver();
         }

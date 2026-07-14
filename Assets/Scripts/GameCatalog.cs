@@ -12,6 +12,7 @@ namespace DungeonDash
             public string id;
             public Sprite[] idle;
             public Sprite[] run;
+            public Sprite[] hit;
             public float speed;
         }
 
@@ -44,5 +45,7 @@ namespace DungeonDash
         public Sprite heartEmpty;
         public Sprite buttonUp;
         public Sprite buttonDown;
+        public Sprite dangerButtonUp;
+        public Sprite dangerButtonDown;
     }
 }

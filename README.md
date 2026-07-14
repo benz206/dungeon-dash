@@ -17,7 +17,9 @@ is not present, then open `Assets/Scenes/SampleScene.unity` and press Play.
 - `M`: artifact market
 - `Esc`: close a menu
 
-All six hero classes are playable. All imported weapon sprites participate in a
+All six hero classes and all eleven imported appearance variants are playable.
+Every imported gameplay sprite is catalogued and verified by an edit-mode test.
+All imported weapon sprites participate in a
 round-robin drop pool so none can be starved by random selection, while each
 artifact's stats are independently rolled. Quality uses `random^4`, making the
 high-stat tail progressively less common. Enemy families likewise rotate through
