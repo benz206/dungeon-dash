@@ -14,7 +14,9 @@ namespace DungeonDash
 
         GameCatalog _catalog;
         SaveData _save;
-        LocalMarketService _market;
+        LocalMarketService _localMarket;
+        UgsMarketService _onlineMarket;
+        bool _useOnlineMarket;
         readonly System.Random _random = new();
         readonly List<EnemyActor> _enemies = new();
         PlayerController _player;
@@ -62,7 +64,8 @@ namespace DungeonDash
             }
 
             _save = SaveData.Load();
-            _market = new LocalMarketService(_save.marketJson);
+            _localMarket = new LocalMarketService(_save.marketJson);
+            _onlineMarket = new UgsMarketService();
             EnsureStartingInventory();
             SeedMarket();
             ConfigureCamera();
@@ -85,7 +88,7 @@ namespace DungeonDash
             if (arguments.Contains("--qa-market") && !_choosingCharacter)
             {
                 _marketOpen = true;
-                ClaimMarketProceeds();
+                ClaimLocalMarketProceeds();
             }
 
             string argument = arguments
@@ -114,7 +117,7 @@ namespace DungeonDash
             {
                 _marketOpen = !_marketOpen;
                 _inventoryOpen = false;
-                if (_marketOpen) ClaimMarketProceeds();
+                if (_marketOpen) OpenMarket();
             }
             if (keyboard.escapeKey.wasPressedThisFrame)
             {
@@ -139,11 +142,11 @@ namespace DungeonDash
 
         void SeedMarket()
         {
-            if (_market.Listings.Count > 0) return;
+            if (_localMarket.Listings.Count > 0) return;
             for (int i = 0; i < Mathf.Min(8, _catalog.weapons.Length); i++)
             {
                 var artifact = ArtifactGenerator.Roll(_catalog.weapons[i].id, _random);
-                _market.AddNpcListing(artifact, artifact.Price);
+                _localMarket.AddNpcListing(artifact, artifact.Price);
             }
             Save();
         }
@@ -248,7 +251,7 @@ namespace DungeonDash
         {
             _enemies.Remove(enemy);
             _kills++;
-            _save.coins += 1 + _wave / 3;
+            AddCoins(1 + _wave / 3);
             if (_kills % 3 == 0) DropArtifact(enemy.transform.position);
             else if (_random.NextDouble() < 0.14d) DropPickup(enemy.transform.position, PickupKind.Potion);
             else if (_random.NextDouble() < 0.12d) DropPickup(enemy.transform.position, PickupKind.Bomb);
@@ -257,7 +260,7 @@ namespace DungeonDash
             if (_enemies.Count == 0 && !_wavePending)
             {
                 _wavePending = true;
-                int sold = _market.SimulateSales(_random);
+                int sold = _localMarket.SimulateSales(_random);
                 DropPickup(Vector2.zero, PickupKind.Chest);
                 if (sold > 0) Toast($"Wave clear — {sold} market listing sold!");
                 StartCoroutine(NextWave());
@@ -297,7 +300,7 @@ namespace DungeonDash
             switch (kind)
             {
                 case PickupKind.Coin:
-                    _save.coins += 3;
+                    AddCoins(3);
                     Toast("+3 coins");
                     break;
                 case PickupKind.Potion:
@@ -305,7 +308,7 @@ namespace DungeonDash
                     Toast("Restored 3 hearts");
                     break;
                 case PickupKind.Chest:
-                    _save.coins += 8 + _wave;
+                    AddCoins(8 + _wave);
                     Toast($"Chest: +{8 + _wave} coins");
                     break;
                 case PickupKind.Bomb:
@@ -376,7 +379,7 @@ namespace DungeonDash
 
         void Save()
         {
-            _save.marketJson = _market.Serialize();
+            _save.marketJson = _localMarket.Serialize();
             _save.Save();
         }
 
@@ -388,12 +391,77 @@ namespace DungeonDash
             _toastUntil = Time.time + 3.5f;
         }
 
-        void ClaimMarketProceeds()
+        void AddCoins(int amount)
         {
-            int coins = _market.ClaimProceeds();
+            _save.coins += amount;
+            if (_save.marketAccountInitialized) _save.marketPendingCoinDelta += amount;
+        }
+
+        void ClaimLocalMarketProceeds()
+        {
+            int coins = _localMarket.ClaimProceeds();
             if (coins <= 0) return;
-            _save.coins += coins;
+            AddCoins(coins);
             Toast($"Collected {coins} market coins");
+            Save();
+        }
+
+        async void OpenMarket()
+        {
+            if (await EnsureOnlineMarket())
+            {
+                try
+                {
+                    var response = await _onlineMarket.ClaimAsync();
+                    SyncOnlineBalance();
+                    if (response.message.StartsWith("Claimed", StringComparison.Ordinal)) Toast(response.message);
+                }
+                catch (Exception exception)
+                {
+                    Toast("Online market: " + exception.GetBaseException().Message);
+                }
+            }
+            else if (!_onlineMarket.IsOnline)
+            {
+                _useOnlineMarket = false;
+                ClaimLocalMarketProceeds();
+            }
+        }
+
+        async System.Threading.Tasks.Task<bool> EnsureOnlineMarket()
+        {
+            try
+            {
+                bool connected;
+                if (_onlineMarket.IsOnline)
+                {
+                    if (_save.marketPendingCoinDelta != 0)
+                        await _onlineMarket.SyncCoinsAsync(_save.marketPendingCoinDelta);
+                    connected = true;
+                }
+                else
+                {
+                    int initialBalance = Mathf.Max(0, _save.coins - _save.marketPendingCoinDelta);
+                    connected = await _onlineMarket.ConnectAsync(initialBalance, _save.marketPendingCoinDelta);
+                }
+
+                if (!connected) return false;
+                _useOnlineMarket = true;
+                _save.marketAccountInitialized = true;
+                _save.marketPendingCoinDelta = 0;
+                SyncOnlineBalance();
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Toast("Online sync failed: " + exception.GetBaseException().Message);
+                return false;
+            }
+        }
+
+        void SyncOnlineBalance()
+        {
+            _save.coins = _onlineMarket.Balance;
             Save();
         }
 
@@ -524,10 +592,24 @@ namespace DungeonDash
             Panel(rect);
             GUILayout.BeginArea(new Rect(rect.x + 25, rect.y + 18, rect.width - 50, rect.height - 36));
             GUILayout.Label("GLOBAL ARTIFACT MARKET", _titleStyle);
-            GUILayout.Label("Local simulation for now · service boundary is ready for an authoritative online backend.", _smallStyle);
-            GUILayout.Label($"Balance: {_save.coins} coins", _labelStyle);
+            GUILayout.Label(_onlineMarket.Status, _smallStyle);
+            string pending = _useOnlineMarket && _onlineMarket.PendingCoins > 0
+                ? $" · {_onlineMarket.PendingCoins} proceeds ready"
+                : string.Empty;
+            GUILayout.Label($"Balance: {_save.coins} coins{pending}", _labelStyle);
+            GUILayout.BeginHorizontal();
+            GUI.enabled = !_onlineMarket.Busy;
+            if (_useOnlineMarket)
+            {
+                if (GUILayout.Button("Refresh", _buttonStyle)) RefreshOnlineMarket();
+                if (GUILayout.Button("Claim proceeds", _buttonStyle)) ClaimOnlineMarket();
+            }
+            else if (GUILayout.Button("Retry online", _buttonStyle)) OpenMarket();
+            GUI.enabled = true;
+            GUILayout.EndHorizontal();
             _marketScroll = GUILayout.BeginScrollView(_marketScroll);
-            foreach (var listing in _market.Listings.ToArray())
+            var listings = _useOnlineMarket ? _onlineMarket.Listings : _localMarket.Listings;
+            foreach (var listing in listings.ToArray())
             {
                 var artifact = listing.artifact;
                 GUILayout.BeginHorizontal(GUI.skin.box);
@@ -536,13 +618,15 @@ namespace DungeonDash
                 GUILayout.Label($"{artifact.rarity} {artifact.displayName} · Q{artifact.quality}", _labelStyle);
                 GUILayout.Label(artifact.Stats + $" · {listing.price} coins", _smallStyle);
                 GUILayout.EndVertical();
-                if (listing.sellerId == LocalMarketService.PlayerSeller)
+                if (IsOwnListing(listing))
                 {
+                    GUI.enabled = !_onlineMarket.Busy;
                     if (GUILayout.Button("Cancel", _buttonStyle, GUILayout.Width(90))) CancelListing(listing);
+                    GUI.enabled = true;
                 }
                 else
                 {
-                    GUI.enabled = _save.coins >= listing.price;
+                    GUI.enabled = !_onlineMarket.Busy && _save.coins >= listing.price;
                     if (GUILayout.Button("Buy", _buttonStyle, GUILayout.Width(90))) BuyListing(listing);
                     GUI.enabled = true;
                 }
@@ -576,28 +660,131 @@ namespace DungeonDash
 
         void ListArtifact(Artifact artifact)
         {
-            _save.inventory.Remove(artifact);
-            _market.List(artifact, artifact.Price);
-            Toast($"Listed {artifact.displayName} for {artifact.Price} coins");
-            Save();
+            if (_onlineMarket.Busy) return;
+            ListArtifactOnlineOrLocal(artifact);
         }
 
         void BuyListing(MarketListing listing)
         {
-            var artifact = _market.Buy(listing.id, ref _save.coins);
-            if (artifact == null) return;
-            _save.inventory.Add(artifact);
-            Toast($"Bought {artifact.displayName}");
-            Save();
+            if (_onlineMarket.Busy) return;
+            BuyListingOnlineOrLocal(listing);
         }
 
         void CancelListing(MarketListing listing)
         {
-            var artifact = _market.Cancel(listing.id);
-            if (artifact == null) return;
-            _save.inventory.Add(artifact);
-            Toast($"Returned {artifact.displayName}");
-            Save();
+            if (_onlineMarket.Busy) return;
+            CancelListingOnlineOrLocal(listing);
+        }
+
+        bool IsOwnListing(MarketListing listing) => _useOnlineMarket
+            ? listing.sellerId == _onlineMarket.PlayerId
+            : listing.sellerId == LocalMarketService.PlayerSeller;
+
+        async void ListArtifactOnlineOrLocal(Artifact artifact)
+        {
+            bool online = await EnsureOnlineMarket();
+            if (!online)
+            {
+                if (_onlineMarket.IsOnline) return;
+                _save.inventory.Remove(artifact);
+                _localMarket.List(artifact, artifact.Price);
+                Toast($"Online unavailable — listed {artifact.displayName} locally");
+                Save();
+                return;
+            }
+
+            try
+            {
+                await _onlineMarket.ListAsync(artifact, artifact.Price);
+                _save.inventory.Remove(artifact);
+                SyncOnlineBalance();
+                Toast($"Listed {artifact.displayName} globally for {artifact.Price} coins");
+            }
+            catch (Exception exception)
+            {
+                Toast("Listing failed: " + exception.GetBaseException().Message);
+            }
+        }
+
+        async void BuyListingOnlineOrLocal(MarketListing listing)
+        {
+            if (!_useOnlineMarket)
+            {
+                int oldBalance = _save.coins;
+                var localArtifact = _localMarket.Buy(listing.id, ref _save.coins);
+                if (localArtifact == null) return;
+                if (_save.marketAccountInitialized)
+                    _save.marketPendingCoinDelta += _save.coins - oldBalance;
+                _save.inventory.Add(localArtifact);
+                Toast($"Bought {localArtifact.displayName} locally");
+                Save();
+                return;
+            }
+
+            try
+            {
+                var response = await _onlineMarket.BuyAsync(listing.id);
+                if (response.artifact != null) _save.inventory.Add(response.artifact);
+                SyncOnlineBalance();
+                Toast(response.message);
+            }
+            catch (Exception exception)
+            {
+                Toast("Purchase failed: " + exception.GetBaseException().Message);
+            }
+        }
+
+        async void CancelListingOnlineOrLocal(MarketListing listing)
+        {
+            if (!_useOnlineMarket)
+            {
+                var localArtifact = _localMarket.Cancel(listing.id);
+                if (localArtifact == null) return;
+                _save.inventory.Add(localArtifact);
+                Toast($"Returned {localArtifact.displayName}");
+                Save();
+                return;
+            }
+
+            try
+            {
+                var response = await _onlineMarket.CancelAsync(listing.id);
+                if (response.artifact != null) _save.inventory.Add(response.artifact);
+                SyncOnlineBalance();
+                Toast(response.message);
+            }
+            catch (Exception exception)
+            {
+                Toast("Cancel failed: " + exception.GetBaseException().Message);
+            }
+        }
+
+        async void RefreshOnlineMarket()
+        {
+            try
+            {
+                await _onlineMarket.RefreshAsync();
+                SyncOnlineBalance();
+                Toast("Market refreshed");
+            }
+            catch (Exception exception)
+            {
+                Toast("Refresh failed: " + exception.GetBaseException().Message);
+            }
+        }
+
+        async void ClaimOnlineMarket()
+        {
+            try
+            {
+                var response = await _onlineMarket.ClaimAsync();
+                SyncOnlineBalance();
+                Toast(response.message);
+            }
+            catch (Exception exception)
+            {
+                Toast("Claim failed: " + exception.GetBaseException().Message);
+            }
         }
 
         void Panel(Rect rect)

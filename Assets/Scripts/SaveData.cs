@@ -12,6 +12,8 @@ namespace DungeonDash
         public string equippedId;
         public List<Artifact> inventory = new();
         public string marketJson;
+        public int marketPendingCoinDelta;
+        public bool marketAccountInitialized;
 
         const string Key = "DungeonDash.Save.v1";
 
