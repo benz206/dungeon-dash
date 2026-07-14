@@ -33,6 +33,7 @@ namespace DungeonDash
         string _toast = "Choose a hero";
         float _toastUntil;
         GUIStyle _titleStyle;
+        GUIStyle _toastStyle;
         GUIStyle _labelStyle;
         GUIStyle _smallStyle;
         GUIStyle _buttonStyle;
@@ -66,6 +67,38 @@ namespace DungeonDash
             SeedMarket();
             ConfigureCamera();
             BuildArena();
+        }
+
+        void Start()
+        {
+            const string captureArgument = "--qa-screenshot=";
+            const string characterArgument = "--qa-character=";
+            string[] arguments = Environment.GetCommandLineArgs();
+            string character = arguments
+                .FirstOrDefault(x => x.StartsWith(characterArgument, StringComparison.Ordinal));
+            if (character != null)
+            {
+                string id = character.Substring(characterArgument.Length);
+                var skin = _catalog.characters.FirstOrDefault(x => x.id == id);
+                if (skin != null) StartRun(skin);
+            }
+            if (arguments.Contains("--qa-market") && !_choosingCharacter)
+            {
+                _marketOpen = true;
+                ClaimMarketProceeds();
+            }
+
+            string argument = arguments
+                .FirstOrDefault(x => x.StartsWith(captureArgument, StringComparison.Ordinal));
+            if (argument != null)
+                StartCoroutine(CaptureQaFrame(argument.Substring(captureArgument.Length)));
+        }
+
+        static IEnumerator CaptureQaFrame(string path)
+        {
+            yield return new WaitForEndOfFrame();
+            ScreenCapture.CaptureScreenshot(path);
+            Debug.Log($"[DungeonDash] QA screenshot: {path}");
         }
 
         void Update()
@@ -138,7 +171,8 @@ namespace DungeonDash
             for (int x = -11; x <= 11; x++)
             {
                 var sprite = _catalog.floors[Math.Abs(x * 7 + y * 13) % _catalog.floors.Length];
-                CreateSprite($"Floor {x},{y}", sprite, new Vector2(x, y), -20, root);
+                var floor = CreateSprite($"Floor {x},{y}", sprite, new Vector2(x, y), -20, root);
+                floor.GetComponent<SpriteRenderer>().color = new Color(0.58f, 0.62f, 0.68f);
             }
 
             int wallIndex = 0;
@@ -157,6 +191,7 @@ namespace DungeonDash
         void CreateWall(Vector2 position, int index, Transform parent)
         {
             var go = CreateSprite("Wall", _catalog.walls[index % _catalog.walls.Length], position, -5, parent);
+            go.GetComponent<SpriteRenderer>().color = new Color(0.68f, 0.72f, 0.78f);
             go.AddComponent<BoxCollider2D>();
         }
 
@@ -294,7 +329,7 @@ namespace DungeonDash
         public void Fire(Vector2 position, Vector2 direction, int damage, Sprite sprite, bool critical)
         {
             var go = CreateSprite(critical ? "Critical shot" : "Shot", sprite, position, 12);
-            go.transform.localScale = critical ? Vector3.one * 1.25f : Vector3.one;
+            go.transform.localScale = Vector3.one * (critical ? 0.7f : 0.55f);
             go.AddComponent<ProjectileActor>().Setup(this, direction, damage);
         }
 
@@ -367,6 +402,7 @@ namespace DungeonDash
             if (_titleStyle != null) return;
             _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 30, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             _titleStyle.normal.textColor = new Color(1f, 0.84f, 0.35f);
+            _toastStyle = new GUIStyle(_titleStyle) { fontSize = 23 };
             _labelStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, wordWrap = true };
             _labelStyle.normal.textColor = Color.white;
             _smallStyle = new GUIStyle(_labelStyle) { fontSize = 14 };
@@ -383,6 +419,22 @@ namespace DungeonDash
         void OnGUI()
         {
             InitStyles();
+            if (_choosingCharacter)
+            {
+                DrawCharacterPicker();
+                return;
+            }
+            if (_inventoryOpen)
+            {
+                DrawInventory();
+                return;
+            }
+            if (_marketOpen)
+            {
+                DrawMarket();
+                return;
+            }
+
             var previous = GUI.color;
             GUI.color = new Color(0.04f, 0.055f, 0.09f, 0.94f);
             GUI.Box(new Rect(14, 14, 355, 114), GUIContent.none, _boxStyle);
@@ -393,11 +445,8 @@ namespace DungeonDash
             GUI.Label(new Rect(Screen.width - 350, 22, 330, 70), "WASD move · Mouse aim/fire · Space fire\nI artifacts · M global market · Esc close", _smallStyle);
 
             if (Time.time < _toastUntil)
-                GUI.Label(new Rect(Screen.width / 2f - 330, 22, 660, 42), _toast, _titleStyle);
-            if (_choosingCharacter) DrawCharacterPicker();
-            else if (_gameOver) DrawGameOver();
-            else if (_inventoryOpen) DrawInventory();
-            else if (_marketOpen) DrawMarket();
+                GUI.Label(new Rect(Screen.width / 2f - 270, 70, 540, 36), _toast, _toastStyle);
+            if (_gameOver) DrawGameOver();
         }
 
         void DrawHearts(Rect start)
@@ -423,7 +472,8 @@ namespace DungeonDash
             {
                 var skin = _catalog.characters[i];
                 GUILayout.BeginVertical(GUILayout.Width(130));
-                GUILayout.Label(new GUIContent(skin.idle[0].texture), GUILayout.Width(96), GUILayout.Height(120));
+                var preview = GUILayoutUtility.GetRect(96, 120, GUILayout.Width(96), GUILayout.Height(120));
+                GUI.DrawTexture(preview, skin.idle[0].texture, ScaleMode.ScaleToFit, true);
                 if (GUILayout.Button(Pretty(skin.id), _buttonStyle)) StartRun(skin);
                 GUILayout.Label($"Speed {skin.speed:0.0}", _smallStyle);
                 GUILayout.EndVertical();

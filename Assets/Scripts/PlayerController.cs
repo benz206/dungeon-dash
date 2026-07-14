@@ -37,6 +37,7 @@ namespace DungeonDash
             weapon.transform.SetParent(transform);
             _weaponRenderer = weapon.AddComponent<SpriteRenderer>();
             _weaponRenderer.sortingOrder = 11;
+            weapon.transform.localScale = Vector3.one * 0.55f;
             RefreshWeapon();
         }
 

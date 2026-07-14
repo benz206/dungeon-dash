@@ -96,8 +96,8 @@ namespace DungeonDash.EditorTools
                 .Select(sprite => new GameCatalog.NamedSprite { id = sprite.name, sprite = sprite }).ToArray();
 
             var tiles = LoadSprites(ArtTiles);
-            catalog.floors = tiles.Where(x => x.name.StartsWith("floor_")).ToArray();
-            catalog.walls = tiles.Where(x => !x.name.StartsWith("floor_")).ToArray();
+            catalog.floors = tiles.Where(x => Regex.IsMatch(x.name, @"^floor_\d+$")).ToArray();
+            catalog.walls = tiles.Where(x => !Regex.IsMatch(x.name, @"^floor_\d+$")).ToArray();
             catalog.coins = LoadSprites("Assets/Art/Items/coin");
             catalog.potions = LoadSprites("Assets/Art/Items/potion");
             catalog.chests = LoadSprites("Assets/Art/Items/chest");
