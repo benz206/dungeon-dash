@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Unity.Services.Authentication;
 using Unity.Services.CloudCode;
 using Unity.Services.Core;
+using Unity.Services.Core.Environments;
 
 namespace DungeonDash
 {
@@ -31,7 +32,15 @@ namespace DungeonDash
 
         public async Task InitializeAsync()
         {
-            await UnityServices.InitializeAsync();
+            var options = new InitializationOptions();
+            const string environmentArgument = "--ugs-environment=";
+            foreach (string argument in Environment.GetCommandLineArgs())
+            {
+                if (!argument.StartsWith(environmentArgument, StringComparison.Ordinal)) continue;
+                options.SetEnvironmentName(argument.Substring(environmentArgument.Length));
+                break;
+            }
+            await UnityServices.InitializeAsync(options);
             if (!AuthenticationService.Instance.IsSignedIn)
                 await AuthenticationService.Instance.SignInAnonymouslyAsync();
         }
