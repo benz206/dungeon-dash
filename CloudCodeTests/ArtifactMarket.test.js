@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const market = require("../Assets/CloudCode/ArtifactMarket.js")._test;
 
 function artifact(id = "0123456789abcdef0123456789abcdef") {
@@ -27,6 +28,14 @@ test("rejects impossible and unknown artifacts", () => {
   const unknown = artifact();
   unknown.weaponId = "weapon_cheat";
   assert.throws(() => market.validateArtifact(unknown), /catalog/);
+});
+
+test("server validation accepts every weapon in the Unity catalog", () => {
+  const catalog = fs.readFileSync("Assets/Resources/GameCatalog.asset", "utf8");
+  const weaponSection = catalog.split("  weapons:")[1].split("  floors:")[0];
+  const catalogIds = [...weaponSection.matchAll(/- id: (weapon_[^\n]+)/g)].map(match => match[1]);
+  assert.equal(catalogIds.length, 27);
+  assert.deepEqual([...market.WEAPONS].sort(), catalogIds.sort());
 });
 
 test("list, buy, and claim transfer one artifact and the exact price", () => {
@@ -66,6 +75,25 @@ test("a second buyer loses the purchase race", () => {
   market.applyAction(state, "buyer1", params("buy", { listingId }));
   assert.throws(() => market.applyAction(state, "buyer2", params("buy", { listingId })), /no longer available/);
   assert.equal(state.players.buyer2.balance, 100);
+});
+
+test("offline coin changes and listing cancellation preserve server ownership", () => {
+  const state = market.emptyState();
+  market.applyAction(state, "seller", params("connect", { initialBalance: 50 }));
+  market.applyAction(state, "seller", params("syncCoins", { amount: -17 }));
+  assert.equal(state.players.seller.balance, 33);
+  assert.throws(
+    () => market.applyAction(state, "seller", params("syncCoins", { amount: -34 })),
+    /invalid/,
+  );
+
+  const item = artifact();
+  market.applyAction(state, "seller", params("list", { artifact: item, price: 10 }));
+  const listingId = state.listings[0].id;
+  assert.throws(() => market.applyAction(state, "other", params("cancel", { listingId })), /own active/);
+  const cancelled = market.applyAction(state, "seller", params("cancel", { listingId }));
+  assert.equal(cancelled.artifact.id, item.id);
+  assert.equal(state.owners[item.id], "seller");
 });
 
 test("write-lock conflict reloads and an idempotent retry charges once", async () => {

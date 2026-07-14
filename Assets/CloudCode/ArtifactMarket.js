@@ -221,4 +221,4 @@ async function runMarket({ params, context, logger }, apiOverride) {
   }
 }
 
-module.exports._test = { emptyState, normalizeState, validateArtifact, applyAction, runMarket };
+module.exports._test = { WEAPONS, emptyState, normalizeState, validateArtifact, applyAction, runMarket };

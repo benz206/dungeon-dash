@@ -41,6 +41,8 @@ namespace DungeonDash
                 break;
             }
             await UnityServices.InitializeAsync(options);
+            if (Array.Exists(Environment.GetCommandLineArgs(), x => x == "--qa-fresh-auth"))
+                AuthenticationService.Instance.SignOut(true);
             if (!AuthenticationService.Instance.IsSignedIn)
                 await AuthenticationService.Instance.SignInAnonymouslyAsync();
         }
