@@ -17,14 +17,16 @@ namespace DungeonDash
         public int quality;
         public string rarity;
 
+        public int EffectiveDamage => WeaponRules.AdjustedDamage(weaponId, damage);
         public int Price => Mathf.Max(8, Mathf.RoundToInt(damage * attacksPerSecond * (1f + criticalChance * 3f) * 3f));
-        public string Stats => $"{damage} dmg  {attacksPerSecond:0.00}/s  {criticalChance * 100f:0}% crit";
+        public string Stats => $"{EffectiveDamage} dmg  {attacksPerSecond:0.00}/s  {criticalChance * 100f:0}% crit";
     }
 
     public static class ArtifactGenerator
     {
         public static Artifact Roll(string weaponId, System.Random random)
         {
+            if (!WeaponRules.IsArtifactWeapon(weaponId)) weaponId = "weapon_bow";
             // Four independent successes are required for a near-perfect roll.
             // This makes ordinary items common while preserving an exciting long tail.
             double quality = Math.Pow(random.NextDouble(), 4d);

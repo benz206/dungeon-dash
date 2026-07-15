@@ -13,10 +13,20 @@ namespace DungeonDash
         SpriteRenderer _weaponRenderer;
         Vector2 _move;
         Vector2 _aim = Vector2.right;
+        Vector2 _dashDirection;
+        Vector2 _knockbackDirection;
         float _nextAttack;
+        float _nextDash;
+        float _dashUntil;
+        float _knockbackUntil;
         float _invulnerableUntil;
         float _hitUntil;
+        float _flashUntil;
         float _animationTime;
+
+        const float DashSpeed = 13f;
+        const float DashDuration = 0.16f;
+        const float DashCooldown = 0.75f;
 
         public int Health { get; private set; } = 10;
         public int MaxHealth => 10;
@@ -72,6 +82,7 @@ namespace DungeonDash
                 Vector2 delta = world - transform.position;
                 if (delta.sqrMagnitude > 0.01f) _aim = delta.normalized;
                 if (mouse.leftButton.isPressed) TryAttack();
+                if (mouse.rightButton.wasPressedThisFrame) TryDash();
             }
             if (keyboard != null && keyboard.spaceKey.isPressed) TryAttack();
 
@@ -84,7 +95,12 @@ namespace DungeonDash
 
         void FixedUpdate()
         {
-            if (_body != null)
+            if (_body == null) return;
+            if (Time.time < _dashUntil)
+                _body.linearVelocity = _dashDirection * DashSpeed;
+            else if (Time.time < _knockbackUntil)
+                _body.linearVelocity = _knockbackDirection * 7.5f;
+            else
                 _body.linearVelocity = _move * (_skin?.speed ?? 5f);
         }
 
@@ -94,8 +110,17 @@ namespace DungeonDash
             if (artifact == null || Time.time < _nextAttack) return;
             _nextAttack = Time.time + 1f / artifact.attacksPerSecond;
             bool critical = Random.value < artifact.criticalChance;
-            _game.Fire(transform.position + (Vector3)(_aim * 0.75f), _aim,
-                critical ? artifact.damage * 2 : artifact.damage, _weaponRenderer.sprite, critical);
+            int damage = artifact.EffectiveDamage * (critical ? 2 : 1);
+            _game.UseWeapon(transform.position + (Vector3)(_aim * 0.75f), _aim,
+                damage, artifact.weaponId, _weaponRenderer.sprite, critical);
+        }
+
+        void TryDash()
+        {
+            if (Time.time < _nextDash) return;
+            _dashDirection = _move.sqrMagnitude > 0.01f ? _move.normalized : _aim;
+            _dashUntil = Time.time + DashDuration;
+            _nextDash = Time.time + DashCooldown;
         }
 
         void Animate()
@@ -107,13 +132,25 @@ namespace DungeonDash
                 : _move.sqrMagnitude > 0.01f ? _skin.run : _skin.idle;
             if (frames != null && frames.Length > 0)
                 _renderer.sprite = frames[Mathf.FloorToInt(_animationTime * 10f) % frames.Length];
+            _renderer.color = Time.time < _flashUntil
+                ? new Color(3.5f, 3.5f, 3.5f, 1f)
+                : Color.white;
         }
 
         public void TakeDamage(int amount)
         {
+            TakeDamage(amount, transform.position - (Vector3)_aim);
+        }
+
+        public void TakeDamage(int amount, Vector2 sourcePosition)
+        {
             if (Time.time < _invulnerableUntil || !_game.AcceptsGameplayInput) return;
             _invulnerableUntil = Time.time + 0.65f;
             _hitUntil = Time.time + 0.2f;
+            _flashUntil = Time.time + 0.12f;
+            Vector2 away = (Vector2)transform.position - sourcePosition;
+            _knockbackDirection = away.sqrMagnitude > 0.01f ? away.normalized : -_aim;
+            _knockbackUntil = Time.time + 0.14f;
             Health = Mathf.Max(0, Health - amount);
             if (Health == 0) _game.GameOver();
         }

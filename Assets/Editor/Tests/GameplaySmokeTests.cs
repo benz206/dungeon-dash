@@ -60,5 +60,50 @@ namespace DungeonDashTests
             Assert.That(Object.FindObjectsByType<EnemyActor>(FindObjectsSortMode.None), Has.Length.EqualTo(5));
             yield return new ExitPlayMode();
         }
+
+        [UnityTest]
+        public IEnumerator Weapons_MeleeHitsNearbyTargets_AndBowsFireArrows()
+        {
+            yield return new EnterPlayMode();
+
+            var game = Object.FindFirstObjectByType<DungeonGame>();
+            var catalog = Resources.Load<GameCatalog>("GameCatalog");
+            game.SendMessage("StartRun", catalog.characters[0]);
+            yield return null;
+
+            var player = Object.FindFirstObjectByType<PlayerController>();
+            var enemies = Object.FindObjectsByType<EnemyActor>(FindObjectsSortMode.None);
+            enemies[0].transform.position = player.transform.position + Vector3.right;
+            game.UseWeapon(player.transform.position + Vector3.right * 0.75f, Vector2.right, 9999,
+                "weapon_regular_sword", game.WeaponSprite("weapon_regular_sword"), false);
+            yield return null;
+            Assert.That(Object.FindObjectsByType<EnemyActor>(FindObjectsSortMode.None), Has.Length.EqualTo(5));
+
+            game.UseWeapon(player.transform.position, Vector2.right, 5,
+                "weapon_bow", game.WeaponSprite("weapon_bow"), false);
+            var projectile = Object.FindFirstObjectByType<ProjectileActor>();
+            Assert.That(projectile, Is.Not.Null);
+            Assert.That(projectile.GetComponent<SpriteRenderer>().sprite.name, Is.EqualTo("weapon_arrow"));
+
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator PlayerDamage_GrantsBriefImmunity()
+        {
+            yield return new EnterPlayMode();
+
+            var game = Object.FindFirstObjectByType<DungeonGame>();
+            var catalog = Resources.Load<GameCatalog>("GameCatalog");
+            game.SendMessage("StartRun", catalog.characters[0]);
+            yield return null;
+
+            var player = Object.FindFirstObjectByType<PlayerController>();
+            player.TakeDamage(1, player.transform.position + Vector3.left);
+            player.TakeDamage(1, player.transform.position + Vector3.left);
+            Assert.That(player.Health, Is.EqualTo(9));
+
+            yield return new ExitPlayMode();
+        }
     }
 }

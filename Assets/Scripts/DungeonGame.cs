@@ -20,6 +20,7 @@ namespace DungeonDash
         readonly System.Random _random = new();
         readonly List<EnemyActor> _enemies = new();
         readonly List<Vector2> _enemySpawnPoints = new();
+        readonly HashSet<Vector2Int> _walkable = new();
         PlayerController _player;
         Artifact _equipped;
         int _wave;
@@ -31,6 +32,9 @@ namespace DungeonDash
         bool _inventoryOpen;
         bool _marketOpen;
         bool _wavePending;
+        bool _inventoryOwnsPause;
+        float _timeScaleBeforeInventory = 1f;
+        GameCatalog.CharacterSkin _selectedCharacter;
         Artifact _selectedArtifact;
         Vector2 _inventoryScroll;
         Vector2 _marketScroll;
@@ -96,8 +100,7 @@ namespace DungeonDash
             }
             if (arguments.Contains("--qa-inventory") && !_choosingCharacter)
             {
-                _inventoryOpen = true;
-                SelectDefaultArtifact();
+                SetInventoryOpen(true);
             }
             if (arguments.Contains("--qa-market") && !_choosingCharacter)
             {
@@ -124,25 +127,55 @@ namespace DungeonDash
             if (keyboard == null || _choosingCharacter || _gameOver) return;
             if (keyboard.iKey.wasPressedThisFrame)
             {
-                _inventoryOpen = !_inventoryOpen;
                 _marketOpen = false;
-                if (_inventoryOpen) SelectDefaultArtifact();
+                SetInventoryOpen(!_inventoryOpen);
             }
             if (keyboard.mKey.wasPressedThisFrame)
             {
-                _marketOpen = !_marketOpen;
-                _inventoryOpen = false;
+                bool open = !_marketOpen;
+                SetInventoryOpen(false);
+                _marketOpen = open;
                 if (_marketOpen) OpenMarket();
             }
             if (keyboard.escapeKey.wasPressedThisFrame)
             {
-                _inventoryOpen = false;
+                SetInventoryOpen(false);
                 _marketOpen = false;
             }
         }
 
+        void SetInventoryOpen(bool open)
+        {
+            if (_inventoryOpen == open) return;
+            _inventoryOpen = open;
+            if (open)
+            {
+                _marketOpen = false;
+                SelectDefaultArtifact();
+                _timeScaleBeforeInventory = Time.timeScale;
+                Time.timeScale = 0f;
+                _inventoryOwnsPause = true;
+            }
+            else
+            {
+                ReleaseInventoryPause();
+            }
+        }
+
+        void ReleaseInventoryPause()
+        {
+            if (!_inventoryOwnsPause) return;
+            Time.timeScale = _timeScaleBeforeInventory;
+            _inventoryOwnsPause = false;
+        }
+
         void EnsureStartingInventory()
         {
+            foreach (var artifact in _save.inventory.Where(x => !WeaponRules.IsArtifactWeapon(x.weaponId)))
+            {
+                artifact.weaponId = "weapon_bow";
+                artifact.displayName = artifact.displayName.Replace("Arrow", "Bow");
+            }
             if (_save.inventory.Count == 0)
             {
                 var starter = ArtifactGenerator.Roll(_catalog.weapons[0].id, new System.Random(1));
@@ -158,9 +191,10 @@ namespace DungeonDash
         void SeedMarket()
         {
             if (_localMarket.Listings.Count > 0) return;
-            for (int i = 0; i < Mathf.Min(8, _catalog.weapons.Length); i++)
+            var artifactWeapons = _catalog.weapons.Where(x => WeaponRules.IsArtifactWeapon(x.id)).ToArray();
+            for (int i = 0; i < Mathf.Min(8, artifactWeapons.Length); i++)
             {
-                var artifact = ArtifactGenerator.Roll(_catalog.weapons[i].id, _random);
+                var artifact = ArtifactGenerator.Roll(artifactWeapons[i].id, _random);
                 _localMarket.AddNpcListing(artifact, artifact.Price);
             }
             Save();
@@ -186,6 +220,8 @@ namespace DungeonDash
         {
             var root = new GameObject("Arena").transform;
             var layout = DungeonGenerator.Generate(_random);
+            _walkable.Clear();
+            _walkable.UnionWith(layout.Walkable);
             foreach (var cell in layout.Walkable)
             {
                 float age = layout.FloorAge[cell];
@@ -277,8 +313,10 @@ namespace DungeonDash
                 var skin = _catalog.enemies[_enemyCursor++ % _catalog.enemies.Length];
                 var position = _enemySpawnPoints[(i * 7 + _wave * 3) % _enemySpawnPoints.Count];
                 var go = CreateSprite(skin.id, skin.idle[0], position, 8);
+                go.AddComponent<EnemyNavigator>().Setup(this, _walkable,
+                    1.5f + Mathf.Min(_wave * 0.04f, 0.7f));
                 var enemy = go.AddComponent<EnemyActor>();
-                enemy.Setup(this, skin, 11 + _wave * 4, 1.5f + Mathf.Min(_wave * 0.04f, 0.7f));
+                enemy.Setup(this, skin, 11 + _wave * 4);
                 _enemies.Add(enemy);
             }
             Toast($"Wave {_wave}");
@@ -313,7 +351,8 @@ namespace DungeonDash
 
         void DropArtifact(Vector2 position)
         {
-            string weaponId = _catalog.weapons[_weaponCursor++ % _catalog.weapons.Length].id;
+            var artifactWeapons = _catalog.weapons.Where(x => WeaponRules.IsArtifactWeapon(x.id)).ToArray();
+            string weaponId = artifactWeapons[_weaponCursor++ % artifactWeapons.Length].id;
             var artifact = ArtifactGenerator.Roll(weaponId, _random);
             var go = CreateSprite(artifact.displayName, WeaponSprite(weaponId), position, 7);
             go.AddComponent<PickupActor>().Setup(this, PickupKind.Artifact, artifact);
@@ -328,8 +367,15 @@ namespace DungeonDash
                 PickupKind.Bomb => _catalog.bombs,
                 _ => _catalog.chests
             };
-            var go = CreateSprite(kind.ToString(), sprites[0], position, 7);
-            go.AddComponent<PickupActor>().Setup(this, kind, null, sprites);
+            Sprite sprite = kind switch
+            {
+                PickupKind.Potion => sprites.FirstOrDefault(x => x.name == "flask_big_red") ?? sprites[0],
+                PickupKind.Chest => sprites.FirstOrDefault(x => x.name == "chest_full_open_anim_f0") ?? sprites[0],
+                _ => sprites[0]
+            };
+            Sprite[] animation = kind is PickupKind.Coin or PickupKind.Bomb ? sprites : null;
+            var go = CreateSprite(kind.ToString(), sprite, position, 7);
+            go.AddComponent<PickupActor>().Setup(this, kind, null, animation);
         }
 
         public void Collect(PickupKind kind, Artifact artifact)
@@ -366,11 +412,42 @@ namespace DungeonDash
             Save();
         }
 
+        public void UseWeapon(Vector2 position, Vector2 direction, int damage, string weaponId,
+            Sprite equippedSprite, bool critical)
+        {
+            if (WeaponRules.IsRanged(weaponId))
+            {
+                Fire(position, direction, damage, WeaponSprite(WeaponRules.ProjectileSpriteId(weaponId)), critical);
+                return;
+            }
+
+            MeleeStrike(position, direction, damage, equippedSprite, critical);
+        }
+
         public void Fire(Vector2 position, Vector2 direction, int damage, Sprite sprite, bool critical)
         {
             var go = CreateSprite(critical ? "Critical shot" : "Shot", sprite, position, 12);
             go.transform.localScale = Vector3.one * (critical ? 0.7f : 0.55f);
             go.AddComponent<ProjectileActor>().Setup(this, direction, damage);
+        }
+
+        void MeleeStrike(Vector2 position, Vector2 direction, int damage, Sprite sprite, bool critical)
+        {
+            var visual = CreateSprite(critical ? "Critical melee swing" : "Melee swing", sprite, position, 13);
+            visual.AddComponent<MeleeSwingActor>().Setup(direction, critical);
+
+            EnemyActor target = null;
+            float closest = 1.45f * 1.45f;
+            foreach (var enemy in _enemies)
+            {
+                if (enemy == null) continue;
+                Vector2 offset = (Vector2)enemy.transform.position - position;
+                float distance = offset.sqrMagnitude;
+                if (distance >= closest || Vector2.Dot(direction, offset.normalized) < 0.2f) continue;
+                closest = distance;
+                target = enemy;
+            }
+            target?.TakeDamage(damage, position - direction * 0.75f);
         }
 
         public EnemyActor ProjectileTarget(Vector2 position)
@@ -391,6 +468,7 @@ namespace DungeonDash
         public Vector2 PlayerPosition => _player == null ? Vector2.zero : (Vector2)_player.transform.position;
         public bool PlayerAlive => _player != null && _player.Health > 0;
         public void HurtPlayer(int amount) => _player?.TakeDamage(amount);
+        public void HurtPlayer(int amount, Vector2 sourcePosition) => _player?.TakeDamage(amount, sourcePosition);
 
         public Sprite WeaponSprite(string id) =>
             _catalog.weapons.FirstOrDefault(x => x.id == id)?.sprite;
@@ -408,9 +486,10 @@ namespace DungeonDash
             if (_player != null) Destroy(_player.gameObject);
             foreach (var pickup in FindObjectsByType<PickupActor>(FindObjectsSortMode.None)) Destroy(pickup.gameObject);
             foreach (var projectile in FindObjectsByType<ProjectileActor>(FindObjectsSortMode.None)) Destroy(projectile.gameObject);
+            foreach (var swing in FindObjectsByType<MeleeSwingActor>(FindObjectsSortMode.None)) Destroy(swing.gameObject);
             _gameOver = false;
             _choosingCharacter = true;
-            _inventoryOpen = false;
+            SetInventoryOpen(false);
             _marketOpen = false;
         }
 
@@ -419,6 +498,8 @@ namespace DungeonDash
             _save.marketJson = _localMarket.Serialize();
             _save.Save();
         }
+
+        void OnDisable() => ReleaseInventoryPause();
 
         void OnApplicationQuit() => Save();
 
@@ -508,12 +589,20 @@ namespace DungeonDash
             _selectedArtifact = _equipped ?? _save.inventory.OrderByDescending(x => x.quality).FirstOrDefault();
         }
 
+        void SelectDefaultCharacter()
+        {
+            if (_selectedCharacter != null && _catalog.characters.Contains(_selectedCharacter)) return;
+            _selectedCharacter = _catalog.characters.FirstOrDefault(x => x.id == _save.characterId)
+                ?? _catalog.characters[0];
+        }
+
         void InitStyles()
         {
             if (_titleStyle != null) return;
             _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 30, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            _titleStyle.normal.textColor = new Color(1f, 0.84f, 0.35f);
-            _toastStyle = new GUIStyle(_titleStyle) { fontSize = 23 };
+            _titleStyle.normal.textColor = new Color(0.91f, 0.94f, 0.98f);
+            _toastStyle = new GUIStyle(_titleStyle) { fontSize = 21 };
+            _toastStyle.normal.textColor = new Color(0.72f, 0.85f, 0.95f);
             _labelStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, wordWrap = true };
             _labelStyle.normal.textColor = Color.white;
             _smallStyle = new GUIStyle(_labelStyle) { fontSize = 14 };
@@ -525,7 +614,7 @@ namespace DungeonDash
             _dangerButtonStyle.normal.background = _catalog.dangerButtonUp.texture;
             _dangerButtonStyle.active.background = _catalog.dangerButtonDown.texture;
             _sectionStyle = new GUIStyle(_labelStyle) { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
-            _sectionStyle.normal.textColor = new Color(0.42f, 0.79f, 1f);
+            _sectionStyle.normal.textColor = new Color(0.47f, 0.72f, 0.86f);
             _mutedStyle = new GUIStyle(_smallStyle) { fontSize = 13 };
             _mutedStyle.normal.textColor = new Color(0.53f, 0.59f, 0.69f);
             _microStyle = new GUIStyle(_mutedStyle) { fontSize = 11, fontStyle = FontStyle.Bold };
@@ -562,29 +651,30 @@ namespace DungeonDash
                 return;
             }
 
-            var statusRect = new Rect(18, 18, 410, 112);
-            DrawRect(statusRect, new Color(0.025f, 0.04f, 0.075f, 0.96f));
-            DrawBorder(statusRect, new Color(0.18f, 0.3f, 0.5f, 0.9f), 2f);
+            var statusRect = new Rect(18, 18, 440, 112);
+            DrawRect(statusRect, new Color(0.018f, 0.028f, 0.045f, 0.96f));
+            DrawBorder(statusRect, new Color(0.19f, 0.28f, 0.38f, 0.9f), 1f);
             if (_player != null) DrawHearts(new Rect(28, 28, 30, 30));
-            GUI.Label(new Rect(28, 61, 370, 25), $"{_save.coins} COINS     WAVE {_wave}     {_kills} KILLS", _sectionStyle);
+            if (_catalog.coins.Length > 0)
+                GUI.DrawTexture(new Rect(27, 60, 22, 22), _catalog.coins[0].texture, ScaleMode.ScaleToFit, true);
+            GUI.Label(new Rect(53, 59, 380, 25), $"{_save.coins}     WAVE {_wave}     {_kills} KILLS", _sectionStyle);
             if (_equipped != null)
             {
                 DrawRect(new Rect(28, 91, 3, 22), RarityColor(_equipped.rarity));
-                GUI.Label(new Rect(39, 88, 375, 28), $"{_equipped.rarity.ToUpperInvariant()}  {_equipped.displayName}  ·  Q{_equipped.quality}", _smallStyle);
+                GUI.Label(new Rect(39, 88, 395, 28), $"{_equipped.rarity.ToUpperInvariant()}  {_equipped.displayName}  ·  Q{_equipped.quality}", _smallStyle);
             }
 
             float menuX = _uiWidth - 354f;
             if (GUI.Button(new Rect(menuX, 20, 160, 40), "VAULT  [I]", _buttonStyle))
             {
-                _inventoryOpen = true;
-                SelectDefaultArtifact();
+                SetInventoryOpen(true);
             }
             if (GUI.Button(new Rect(menuX + 170, 20, 160, 40), "MARKET  [M]", _buttonStyle))
             {
                 _marketOpen = true;
                 OpenMarket();
             }
-            GUI.Label(new Rect(menuX, 67, 330, 46), "WASD move  ·  Mouse aim / fire  ·  Space fire", _centerStyle);
+            GUI.Label(new Rect(menuX, 67, 330, 46), "WASD MOVE  ·  LMB ATTACK  ·  RMB DASH", _centerStyle);
 
             if (Time.time < _toastUntil)
                 GUI.Label(new Rect(_uiWidth / 2f - 300, 72, 600, 36), _toast, _toastStyle);
@@ -605,43 +695,109 @@ namespace DungeonDash
         void DrawCharacterPicker()
         {
             DrawBackdrop();
+            SelectDefaultCharacter();
             var rect = Centered(1120, 650);
             Panel(rect);
-            DrawRect(new Rect(rect.x, rect.y, rect.width, 7), new Color(0.22f, 0.66f, 1f));
-            GUI.Label(new Rect(rect.x + 34, rect.y + 22, rect.width - 68, 42), "DUNGEON DASH", _titleStyle);
-            GUI.Label(new Rect(rect.x + 34, rect.y + 65, rect.width - 68, 24), "CHOOSE YOUR DELVER  ·  SURVIVE THE ARENA  ·  BUILD A LEGENDARY VAULT", _centerStyle);
+            DrawRect(new Rect(rect.x, rect.y, rect.width, 5), new Color(0.38f, 0.65f, 0.78f));
+            GUI.Label(new Rect(rect.x + 34, rect.y + 22, 430, 42), "DUNGEON DASH", _titleStyle);
+            GUI.Label(new Rect(rect.x + 480, rect.y + 29, rect.width - 514, 28), "DELVER REGISTRY  /  CHOOSE YOUR OPERATIVE", _rightStyle);
 
-            var metaRect = new Rect(rect.x + 34, rect.y + 103, rect.width - 68, 42);
-            DrawRect(metaRect, new Color(0.055f, 0.08f, 0.13f, 0.95f));
-            GUI.Label(new Rect(metaRect.x + 16, metaRect.y, 310, metaRect.height), $"{_save.coins} COINS BANKED", _sectionStyle);
-            GUI.Label(new Rect(metaRect.x + 335, metaRect.y, 310, metaRect.height), $"{_save.inventory.Count} ARTIFACTS SECURED", _sectionStyle);
-            GUI.Label(new Rect(metaRect.x + 650, metaRect.y, 390, metaRect.height),
-                _equipped == null ? "NO ARTIFACT EQUIPPED" : $"STARTING WITH  {_equipped.displayName.ToUpperInvariant()}  ·  Q{_equipped.quality}", _rightStyle);
+            var metaRect = new Rect(rect.x + 34, rect.y + 76, rect.width - 68, 44);
+            DrawRect(metaRect, new Color(0.04f, 0.06f, 0.085f, 0.98f));
+            if (_catalog.coins.Length > 0)
+                GUI.DrawTexture(new Rect(metaRect.x + 14, metaRect.y + 10, 24, 24), _catalog.coins[0].texture, ScaleMode.ScaleToFit, true);
+            GUI.Label(new Rect(metaRect.x + 44, metaRect.y, 220, metaRect.height), $"{_save.coins} BANKED", _sectionStyle);
+            GUI.Label(new Rect(metaRect.x + 274, metaRect.y, 240, metaRect.height), $"{_save.inventory.Count} ARTIFACTS", _sectionStyle);
+            GUI.Label(new Rect(metaRect.x + 530, metaRect.y, 500, metaRect.height),
+                _equipped == null ? "NO ARTIFACT EQUIPPED" : $"DEPLOYING WITH  {_equipped.displayName.ToUpperInvariant()}  ·  Q{_equipped.quality}", _rightStyle);
 
-            const float gap = 12f;
-            float cardWidth = (rect.width - 68f - gap * 5f) / 6f;
-            const float cardHeight = 188f;
-            float cardsY = rect.y + 162f;
+            var rosterRect = new Rect(rect.x + 34, rect.y + 138, 706, 468);
+            var detailRect = new Rect(rect.x + 758, rect.y + 138, 328, 468);
+            DrawRect(rosterRect, new Color(0.025f, 0.038f, 0.057f, 0.98f));
+            DrawBorder(rosterRect, new Color(0.12f, 0.18f, 0.25f), 1f);
+
+            const float gap = 10f;
+            const float cardWidth = 219f;
+            const float cardHeight = 103f;
             for (int i = 0; i < _catalog.characters.Length; i++)
             {
                 var skin = _catalog.characters[i];
-                int column = i % 6;
-                int row = i / 6;
-                var card = new Rect(rect.x + 34f + column * (cardWidth + gap), cardsY + row * (cardHeight + gap), cardWidth, cardHeight);
+                int column = i % 3;
+                int row = i / 3;
+                var card = new Rect(rosterRect.x + 14f + column * (cardWidth + gap), rosterRect.y + 15f + row * (cardHeight + gap), cardWidth, cardHeight);
                 bool hovered = card.Contains(Event.current.mousePosition);
-                DrawRect(card, hovered ? new Color(0.09f, 0.16f, 0.25f, 0.98f) : new Color(0.045f, 0.07f, 0.115f, 0.98f));
-                DrawBorder(card, hovered ? new Color(0.3f, 0.75f, 1f) : new Color(0.13f, 0.22f, 0.36f), hovered ? 2f : 1f);
-                var preview = new Rect(card.x + (card.width - 86f) / 2f, card.y + 12f, 86f, 96f);
+                bool selected = skin == _selectedCharacter;
+                DrawRect(card, selected ? new Color(0.085f, 0.13f, 0.18f) : hovered ? new Color(0.06f, 0.09f, 0.125f) : new Color(0.038f, 0.055f, 0.078f));
+                DrawRect(new Rect(card.x, card.y, 3f, card.height), selected ? new Color(0.5f, 0.75f, 0.86f) : new Color(0.18f, 0.27f, 0.34f));
+                if (selected) DrawBorder(card, new Color(0.32f, 0.49f, 0.6f), 1f);
+                var preview = new Rect(card.x + 10f, card.y + 8f, 76f, 86f);
                 GUI.DrawTexture(preview, skin.idle[0].texture, ScaleMode.ScaleToFit, true);
-                GUI.Label(new Rect(card.x + 8, card.y + 111, card.width - 16, 26), Pretty(skin.id).ToUpperInvariant(), _centerStyle);
-                GUI.Label(new Rect(card.x + 8, card.y + 139, card.width - 16, 20), $"MOVE  {skin.speed:0.0}", _microStyle);
-                GUI.Label(new Rect(card.x + 8, card.y + 159, card.width - 16, 20), "SELECT HERO", _centerStyle);
-                if (GUI.Button(card, GUIContent.none, _clickStyle)) StartRun(skin);
+                GUI.Label(new Rect(card.x + 92, card.y + 15, card.width - 102, 23), CharacterName(skin.id).ToUpperInvariant(), _smallStyle);
+                GUI.Label(new Rect(card.x + 92, card.y + 40, card.width - 102, 20),
+                    $"{CharacterRole(skin.id).ToUpperInvariant()}  /  {CharacterVariant(skin.id)}", _microStyle);
+                GUI.Label(new Rect(card.x + 92, card.y + 66, card.width - 102, 20), $"MOVE  {skin.speed:0.0}", _mutedStyle);
+                if (GUI.Button(card, GUIContent.none, _clickStyle)) _selectedCharacter = skin;
             }
 
-            GUI.Label(new Rect(rect.x + 34, rect.yMax - 40, rect.width - 68, 22),
-                "Every run grows your persistent collection. Press I in the arena to compare and equip your finds.", _centerStyle);
+            DrawCharacterDetails(detailRect, _selectedCharacter);
         }
+
+        void DrawCharacterDetails(Rect rect, GameCatalog.CharacterSkin skin)
+        {
+            DrawRect(rect, new Color(0.03f, 0.045f, 0.065f, 0.99f));
+            DrawBorder(rect, new Color(0.15f, 0.23f, 0.3f), 1f);
+            GUI.Label(new Rect(rect.x + 24, rect.y + 18, rect.width - 48, 22),
+                $"{CharacterRole(skin.id).ToUpperInvariant()}  /  APPEARANCE {CharacterVariant(skin.id)}", _sectionStyle);
+
+            var preview = new Rect(rect.x + 74, rect.y + 51, 180, 184);
+            DrawRect(preview, new Color(0.018f, 0.027f, 0.04f));
+            DrawBorder(preview, new Color(0.22f, 0.34f, 0.43f), 1f);
+            GUI.DrawTexture(new Rect(preview.x + 15, preview.y + 11, 150, 162), skin.idle[0].texture, ScaleMode.ScaleToFit, true);
+
+            GUI.Label(new Rect(rect.x + 22, rect.y + 248, rect.width - 44, 34), CharacterName(skin.id).ToUpperInvariant(), _titleStyle);
+            GUI.Label(new Rect(rect.x + 26, rect.y + 291, rect.width - 52, 44), CharacterDescription(skin.id), _centerStyle);
+            GUI.Label(new Rect(rect.x + 26, rect.y + 346, 160, 20), "MOVEMENT", _microStyle);
+            GUI.Label(new Rect(rect.x + 190, rect.y + 344, 110, 22), skin.speed.ToString("0.0"), _rightStyle);
+            var bar = new Rect(rect.x + 26, rect.y + 372, rect.width - 52, 7);
+            DrawRect(bar, new Color(0.012f, 0.02f, 0.03f));
+            DrawRect(new Rect(bar.x, bar.y, bar.width * Mathf.InverseLerp(4f, 6f, skin.speed), bar.height), new Color(0.42f, 0.68f, 0.79f));
+
+            if (GUI.Button(new Rect(rect.x + 26, rect.yMax - 60, rect.width - 52, 40), "ENTER THE DUNGEON", _buttonStyle))
+                StartRun(skin);
+        }
+
+        static string CharacterName(string id) => CharacterBase(id) switch
+        {
+            "wizzard" => "Wizard",
+            "doc" => "Plague Doctor",
+            string value => Pretty(value)
+        };
+
+        static string CharacterRole(string id) => CharacterBase(id) switch
+        {
+            "knight" => "Vanguard",
+            "elf" => "Pathfinder",
+            "dwarf" => "Sentinel",
+            "lizard" => "Skirmisher",
+            "wizzard" => "Arcanist",
+            _ => "Apothecary"
+        };
+
+        static string CharacterDescription(string id) => CharacterBase(id) switch
+        {
+            "knight" => "A disciplined front-line delver with measured movement.",
+            "elf" => "A swift expedition specialist built for precise repositioning.",
+            "dwarf" => "A deliberate, grounded delver who rewards committed movement.",
+            "lizard" => "The fastest operative in the registry, tuned for evasive play.",
+            "wizzard" => "A methodical arcane delver with balanced mobility.",
+            _ => "A versatile field specialist with above-average mobility."
+        };
+
+        static string CharacterBase(string id) => id.EndsWith("_m", StringComparison.Ordinal)
+            ? id.Substring(0, id.Length - 2)
+            : id;
+
+        static string CharacterVariant(string id) => id.EndsWith("_m", StringComparison.Ordinal) ? "II" : "I";
 
         void DrawInventory()
         {
@@ -652,22 +808,30 @@ namespace DungeonDash
             DrawRect(new Rect(rect.x, rect.y, rect.width, 7), new Color(0.22f, 0.66f, 1f));
             GUI.Label(new Rect(rect.x + 30, rect.y + 18, 500, 38), "THE VAULT", _titleStyle);
             GUI.Label(new Rect(rect.x + 32, rect.y + 58, 570, 22), "LOADOUT & ARTIFACTS  ·  STRONGEST FINDS FIRST", _sectionStyle);
-            GUI.Label(new Rect(rect.x + 630, rect.y + 25, 250, 32), $"{_save.inventory.Count} ARTIFACTS   ·   {_save.coins} COINS", _rightStyle);
-            if (GUI.Button(new Rect(rect.xMax - 164, rect.y + 20, 132, 38), "CLOSE  [I]", _buttonStyle)) _inventoryOpen = false;
+            if (_catalog.coins.Length > 0)
+                GUI.DrawTexture(new Rect(rect.x + 656, rect.y + 29, 22, 22), _catalog.coins[0].texture, ScaleMode.ScaleToFit, true);
+            GUI.Label(new Rect(rect.x + 684, rect.y + 25, 196, 32), $"{_save.coins}  ·  {_save.inventory.Count} ARTIFACTS", _rightStyle);
+            if (GUI.Button(new Rect(rect.xMax - 164, rect.y + 20, 132, 38), "RESUME  [I]", _buttonStyle)) SetInventoryOpen(false);
 
             var listRect = new Rect(rect.x + 30, rect.y + 96, 590, 500);
             var detailRect = new Rect(rect.x + 640, rect.y + 96, 410, 500);
             DrawRect(listRect, new Color(0.027f, 0.045f, 0.075f, 0.98f));
             DrawBorder(listRect, new Color(0.12f, 0.21f, 0.34f), 1f);
-            DrawRect(new Rect(listRect.x, listRect.y, listRect.width, 42), new Color(0.055f, 0.09f, 0.145f));
-            GUI.Label(new Rect(listRect.x + 14, listRect.y, 300, 42), "YOUR COLLECTION", _sectionStyle);
-            GUI.Label(new Rect(listRect.x + 330, listRect.y, 240, 42), "SELECT TO INSPECT", _rightStyle);
+            DrawRect(new Rect(listRect.x, listRect.y, listRect.width, 64), new Color(0.045f, 0.07f, 0.105f));
+            var hero = _catalog.characters.FirstOrDefault(x => x.id == _save.characterId);
+            if (hero != null)
+            {
+                GUI.DrawTexture(new Rect(listRect.x + 10, listRect.y + 4, 54, 56), hero.idle[0].texture, ScaleMode.ScaleToFit, true);
+                GUI.Label(new Rect(listRect.x + 73, listRect.y + 8, 250, 23), CharacterName(hero.id).ToUpperInvariant(), _smallStyle);
+                GUI.Label(new Rect(listRect.x + 73, listRect.y + 32, 250, 20), $"{CharacterRole(hero.id).ToUpperInvariant()}  ·  ACTIVE DELVER", _microStyle);
+            }
+            GUI.Label(new Rect(listRect.x + 330, listRect.y + 11, 240, 42), "SELECT ARTIFACT TO INSPECT", _rightStyle);
 
             var artifacts = _save.inventory
                 .OrderByDescending(x => x.id == _equipped.id)
                 .ThenByDescending(x => x.quality)
                 .ToArray();
-            var viewport = new Rect(listRect.x + 8, listRect.y + 50, listRect.width - 16, listRect.height - 58);
+            var viewport = new Rect(listRect.x + 8, listRect.y + 72, listRect.width - 16, listRect.height - 80);
             float contentHeight = Mathf.Max(viewport.height - 1f, artifacts.Length * 82f);
             _inventoryScroll = GUI.BeginScrollView(viewport, _inventoryScroll,
                 new Rect(0, 0, viewport.width - 18f, contentHeight));
@@ -721,7 +885,8 @@ namespace DungeonDash
             GUI.Label(new Rect(rect.x + 160, rect.y + 179, rect.width - 184, 20), $"VALUE  {artifact.Price} COINS", _mutedStyle);
 
             float statsY = rect.y + 222f;
-            DrawStat(new Rect(rect.x + 24, statsY, rect.width - 48, 48), "DAMAGE", artifact.damage.ToString(), artifact.damage / 30f, rarity);
+            DrawStat(new Rect(rect.x + 24, statsY, rect.width - 48, 48), "DAMAGE",
+                artifact.EffectiveDamage.ToString(), artifact.EffectiveDamage / 40f, rarity);
             DrawStat(new Rect(rect.x + 24, statsY + 58, rect.width - 48, 48), "ATTACK SPEED", $"{artifact.attacksPerSecond:0.00} / SEC", artifact.attacksPerSecond / 3.5f, rarity);
             DrawStat(new Rect(rect.x + 24, statsY + 116, rect.width - 48, 48), "CRITICAL CHANCE", $"{artifact.criticalChance * 100f:0}%", artifact.criticalChance / 0.3f, rarity);
 
@@ -999,39 +1164,47 @@ namespace DungeonDash
         DungeonGame _game;
         GameCatalog.EnemySkin _skin;
         SpriteRenderer _renderer;
+        EnemyNavigator _navigator;
         int _health;
-        float _speed;
         float _animationTime;
-        float _nextHit;
+        float _flashUntil;
+        float _invulnerableUntil;
 
-        public void Setup(DungeonGame game, GameCatalog.EnemySkin skin, int health, float speed)
+        public void Setup(DungeonGame game, GameCatalog.EnemySkin skin, int health)
         {
             _game = game;
             _skin = skin;
             _health = health;
-            _speed = speed;
             _renderer = GetComponent<SpriteRenderer>();
+            _navigator = GetComponent<EnemyNavigator>();
         }
 
         void Update()
         {
+            _renderer.color = Time.time < _flashUntil
+                ? new Color(3.5f, 3.5f, 3.5f, 1f)
+                : Color.white;
             if (!_game.PlayerAlive || !_game.WorldRunning) return;
             Vector2 delta = _game.PlayerPosition - (Vector2)transform.position;
-            if (delta.magnitude > 0.85f)
-                transform.position += (Vector3)(delta.normalized * (_speed * Time.deltaTime));
-            else if (Time.time >= _nextHit)
-            {
-                _nextHit = Time.time + 0.9f;
-                _game.HurtPlayer(1);
-            }
             _renderer.flipX = delta.x < 0f;
             _animationTime += Time.deltaTime;
-            var frames = delta.magnitude > 0.9f && _skin.run.Length > 0 ? _skin.run : _skin.idle;
+            var frames = _navigator != null && _navigator.Velocity.sqrMagnitude > 0.01f && _skin.run.Length > 0
+                ? _skin.run
+                : _skin.idle;
             if (frames.Length > 0) _renderer.sprite = frames[Mathf.FloorToInt(_animationTime * 8f) % frames.Length];
         }
 
         public void TakeDamage(int damage)
         {
+            TakeDamage(damage, _game == null ? transform.position : _game.PlayerPosition);
+        }
+
+        public void TakeDamage(int damage, Vector2 sourcePosition)
+        {
+            if (Time.time < _invulnerableUntil) return;
+            _invulnerableUntil = Time.time + 0.12f;
+            _flashUntil = Time.time + 0.1f;
+            _navigator?.KnockbackFrom(sourcePosition);
             _health -= damage;
             if (_health > 0) return;
             _game.EnemyDied(this);
@@ -1057,11 +1230,12 @@ namespace DungeonDash
 
         void Update()
         {
+            if (!_game.WorldRunning) return;
             transform.position += (Vector3)(_direction * (11f * Time.deltaTime));
             var target = _game.ProjectileTarget(transform.position);
             if (target != null)
             {
-                target.TakeDamage(_damage);
+                target.TakeDamage(_damage, transform.position - (Vector3)(_direction * 0.35f));
                 Destroy(gameObject);
             }
             else if (Time.time >= _expires) Destroy(gameObject);
@@ -1089,6 +1263,7 @@ namespace DungeonDash
 
         void Update()
         {
+            if (!_game.WorldRunning) return;
             if (_frames != null && _frames.Length > 0)
                 _renderer.sprite = _frames[Mathf.FloorToInt(Time.time * 8f) % _frames.Length];
             transform.localScale = Vector3.one * (1f + Mathf.Sin(Time.time * 5f) * 0.07f);
