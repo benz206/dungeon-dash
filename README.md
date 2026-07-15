@@ -1,74 +1,88 @@
 # Dungeon Dash
 
-A compact Unity 6 PC arena roguelite inspired by the immediate, clean combat of
-*Soul Knight*. Choose a hero, survive escalating waves, collect uniquely rolled
-weapon artifacts, and trade them through a shared Unity Gaming Services market.
+Dungeon Dash is a small PC arena roguelite built with Unity 6. It takes some
+inspiration from *Soul Knight*: pick a hero, fight through increasingly busy
+waves, and collect weapons with randomly rolled stats. Artifacts can also be
+listed on a shared market for other players to buy.
 
-## Play
+## Running the game
 
-Open the project with Unity `6000.3.2f1`. Before the first run, choose
-`Tools > Dungeon Dash > Generate Everything` if `Assets/Resources/GameCatalog.asset`
-is not present, then open `Assets/Scenes/SampleScene.unity` and press Play.
+Open the project in Unity `6000.3.2f1`. If
+`Assets/Resources/GameCatalog.asset` is missing, run
+`Tools > Dungeon Dash > Generate Everything` before starting. Then open
+`Assets/Scenes/SampleScene.unity` and press Play.
 
-- `WASD`: move
-- Mouse: aim and fire
-- `Space`: fire toward the cursor
-- `I`: artifact inventory
-- `M`: artifact market
-- `Esc`: close a menu
+### Controls
 
-All six hero classes and all eleven imported appearance variants are playable.
-Every imported gameplay sprite is catalogued and verified by an edit-mode test.
-All imported weapon sprites participate in a
-round-robin drop pool so none can be starved by random selection, while each
-artifact's stats are independently rolled. Quality uses `random^4`, making the
-high-stat tail progressively less common. Enemy families likewise rotate through
-successive waves.
+- `WASD` — move
+- Mouse — aim and fire
+- `Space` — fire toward the cursor
+- `I` — open the artifact inventory
+- `M` — open the artifact market
+- `Esc` — close the current menu
 
-## Global artifact market
+There are six playable hero classes and eleven appearance variants. Weapons
+drop from a round-robin pool, so every imported weapon gets a turn instead of
+being left entirely to chance. Their stats are still rolled independently, and
+high-quality rolls are intentionally rare. Enemy families rotate between waves
+in a similar way.
+
+## Artifact market
 
 Opening the market signs the player into Unity Authentication anonymously and
-calls the `ArtifactMarket` Cloud Code endpoint. The server stores the shared
-market in private Cloud Save Game Data and uses write locks for atomic list, buy,
-cancel, claim, and coin-sync operations. Mutation IDs make retries idempotent, so
-a lost response cannot charge a buyer twice. The server rejects duplicate
-artifact IDs, unknown weapon sprites, impossible stat combinations, purchases of
-one's own listing, and unaffordable purchases.
+connects to the `ArtifactMarket` Cloud Code endpoint. Listings are kept in Cloud
+Save, and the server handles listing, buying, cancelling, claiming, and coin
+syncing. It also validates artifacts and makes repeated requests safe, so a
+retry cannot charge someone twice.
 
-If UGS is unavailable during the initial connection, the UI explicitly switches
-to the persistent local market. It never silently falls back after an in-flight
-online mutation because that could duplicate an artifact whose server result is
-not yet known.
+If Unity Gaming Services cannot be reached during the initial connection, the
+game switches to a persistent local market and says so in the UI. It does not
+switch to local data after an online transaction has already started, since the
+server may have completed a request even if the response never reached the
+client.
 
-The default player build connects to the UGS production environment. For a test
-environment, launch it with `--ugs-environment=<environment-name>`.
+Player builds use the UGS production environment by default. To use another
+environment, launch the game with:
 
-The market is server-authoritative for transactions and ownership after an
-artifact first enters the market. Artifact drops and gameplay coin awards remain
-client-originated because the game itself is currently single-player and must
-remain playable offline. Moving combat simulation to a multiplayer server is the
-natural point to make drop issuance fully authoritative.
+```text
+--ugs-environment=<environment-name>
+```
 
-For deployed-market QA, a standalone build supports two inert-by-default smoke
-flags. Run a seller with `--qa-fresh-auth --qa-market-list`, copy the logged
-listing ID, then run a buyer with
-`--qa-fresh-auth --qa-market-buy=<listing-id>`. A third fresh buyer must fail on
-that same ID, proving the listing can only be purchased once. Add
-`--ugs-environment=<environment-name>` to all three commands when testing outside
+The market is authoritative for transactions and for artifacts that have
+entered it. Drops and gameplay coin rewards still originate on the client. That
+keeps the single-player game usable offline; making those rewards fully
+authoritative would require moving the combat simulation to a server as well.
+
+### Market smoke test
+
+A standalone build includes a few command-line flags for checking a deployed
+market. They do nothing unless passed explicitly.
+
+1. Start a seller with `--qa-fresh-auth --qa-market-list` and copy the listing
+   ID from the log.
+2. Start a buyer with `--qa-fresh-auth --qa-market-buy=<listing-id>`.
+3. Start another fresh buyer with the same listing ID. That purchase should
+   fail, confirming that the listing can only be bought once.
+
+Add `--ugs-environment=<environment-name>` to each command when testing outside
 production.
 
 ## Tests
 
-Unity edit-mode tests cover every hero starting a real run, combat, complete
-sprite-path coverage, artifact bounds and rarity distribution, local market
-persistence, UGS fallback, and idempotent client retries. The Node Cloud Code
-suite covers server validation, exact catalog parity, balances, ownership,
-insufficient funds, purchase races, write-lock retries, and idempotency.
+The Unity edit-mode tests cover hero startup, combat, sprite catalog coverage,
+artifact bounds and rarity, local market persistence, UGS fallback, and client
+retry behavior. The Node tests cover the Cloud Code side, including validation,
+balances, ownership, purchase races, write-lock retries, and idempotency.
 
-Run them with:
+Run the Cloud Code tests with:
 
 ```bash
 node --test CloudCodeTests/ArtifactMarket.test.js
+```
+
+Run the Unity edit-mode tests with:
+
+```bash
 /Applications/Unity/Hub/Editor/6000.3.2f1/Unity.app/Contents/MacOS/Unity \
   -batchmode -nographics -projectPath "$(pwd)" -runTests \
   -testPlatform EditMode -testResults /tmp/dungeon-dash-tests.xml
