@@ -7,7 +7,7 @@ listed on a shared market for other players to buy.
 
 ## Running the game
 
-Open the project in Unity `6000.3.2f1`. If
+Open the project in Unity `6000.5.3f1`. If
 `Assets/Resources/GameCatalog.asset` is missing, run
 `Tools > Dungeon Dash > Generate Everything` before starting. Then open
 `Assets/Scenes/SampleScene.unity` and press Play.
@@ -83,7 +83,7 @@ node --test CloudCodeTests/ArtifactMarket.test.js
 Run the Unity edit-mode tests with:
 
 ```bash
-/Applications/Unity/Hub/Editor/6000.3.2f1/Unity.app/Contents/MacOS/Unity \
+/Applications/Unity/Hub/Editor/6000.5.3f1/Unity.app/Contents/MacOS/Unity \
   -batchmode -nographics -projectPath "$(pwd)" -runTests \
   -testPlatform EditMode -testResults /tmp/dungeon-dash-tests.xml
 ```
