@@ -21,7 +21,7 @@ namespace DungeonDashTests
         {
             var layout = DungeonGenerator.Generate(new System.Random(7));
 
-            Assert.That(layout.Rooms, Has.Count.EqualTo(5));
+            Assert.That(layout.Rooms, Has.Count.EqualTo(7));
             Assert.That(layout.Corridors, Is.Not.Empty);
             Assert.That(layout.Doors, Is.Not.Empty);
             Assert.That(layout.Doors.All(door => door.IsOpen && layout.Walkable.Contains(door.Position)), Is.True);
@@ -41,6 +41,35 @@ namespace DungeonDashTests
 
             Assert.That(reached, Has.Count.EqualTo(layout.Walkable.Count));
             Assert.That(layout.Rooms.All(room => room.Age >= 0f && room.Age <= 1f), Is.True);
+        }
+
+        [Test]
+        public void Generate_AcrossSeedsKeepsRoomsSeparateAndEveryFloorReachable()
+        {
+            for (int seed = 0; seed < 100; seed++)
+            {
+                var layout = DungeonGenerator.Generate(new System.Random(seed));
+                for (int first = 0; first < layout.Rooms.Count; first++)
+                for (int second = first + 1; second < layout.Rooms.Count; second++)
+                    Assert.That(layout.Rooms[first].Bounds.Overlaps(layout.Rooms[second].Bounds), Is.False,
+                        $"Seed {seed} created overlapping rooms {first} and {second}");
+
+                var reached = new HashSet<Vector2Int> { Vector2Int.zero };
+                var pending = new Queue<Vector2Int>();
+                pending.Enqueue(Vector2Int.zero);
+                while (pending.Count > 0)
+                {
+                    var cell = pending.Dequeue();
+                    foreach (var direction in Directions)
+                    {
+                        var next = cell + direction;
+                        if (layout.Walkable.Contains(next) && reached.Add(next)) pending.Enqueue(next);
+                    }
+                }
+
+                Assert.That(reached, Has.Count.EqualTo(layout.Walkable.Count),
+                    $"Seed {seed} created unreachable floor tiles");
+            }
         }
 
         [Test]

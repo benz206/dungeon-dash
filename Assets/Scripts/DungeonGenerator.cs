@@ -42,22 +42,36 @@ namespace DungeonDash
 
     public static class DungeonGenerator
     {
+        const int SatelliteRoomCount = 6;
+
         static readonly Vector2Int[] CardinalDirections =
         {
             Vector2Int.left, Vector2Int.right, Vector2Int.up, Vector2Int.down
         };
 
+        static readonly Vector2Int[] RoomAnchors =
+        {
+            new(-14, -10), new(0, -10), new(14, -10),
+            new(-14, 0),                    new(14, 0),
+            new(-14, 10),  new(0, 10),     new(14, 10)
+        };
+
         public static DungeonLayout Generate(System.Random random)
         {
             var layout = new DungeonLayout();
-            AddRoom(layout, new RectInt(-2, -2, 5, 5), random);
-            AddRoom(layout, SatelliteRoom(-8, 4, random), random);
-            AddRoom(layout, SatelliteRoom(8, 4, random), random);
-            AddRoom(layout, SatelliteRoom(-8, -4, random), random);
-            AddRoom(layout, SatelliteRoom(8, -4, random), random);
+            AddRoom(layout, new RectInt(-3, -3, 7, 7), random);
 
-            for (int i = 1; i < layout.Rooms.Count; i++)
-                Connect(layout, layout.Rooms[0].Center, layout.Rooms[i].Center, random.Next(2) == 0);
+            var anchors = RoomAnchors.ToArray();
+            for (int i = anchors.Length - 1; i > 0; i--)
+            {
+                int swapIndex = random.Next(i + 1);
+                (anchors[i], anchors[swapIndex]) = (anchors[swapIndex], anchors[i]);
+            }
+
+            for (int i = 0; i < SatelliteRoomCount; i++)
+                AddRoom(layout, SatelliteRoom(anchors[i], random), random);
+
+            ConnectClosestRooms(layout, random);
 
             foreach (var cell in layout.Corridors)
             {
@@ -75,12 +89,42 @@ namespace DungeonDash
             return layout;
         }
 
-        static RectInt SatelliteRoom(int centerX, int centerY, System.Random random)
+        static RectInt SatelliteRoom(Vector2Int anchor, System.Random random)
         {
-            int width = random.Next(4, 6);
-            int height = random.Next(3, 5);
+            int width = random.Next(5, 9);
+            int height = random.Next(4, 7);
+            int centerX = anchor.x + random.Next(-2, 3);
+            int centerY = anchor.y + random.Next(-1, 2);
             return new RectInt(centerX - width / 2, centerY - height / 2, width, height);
         }
+
+        static void ConnectClosestRooms(DungeonLayout layout, System.Random random)
+        {
+            var connected = new HashSet<int> { 0 };
+            while (connected.Count < layout.Rooms.Count)
+            {
+                int closestFrom = 0;
+                int closestTo = 0;
+                int closestDistance = int.MaxValue;
+                foreach (int from in connected)
+                for (int to = 0; to < layout.Rooms.Count; to++)
+                {
+                    if (connected.Contains(to)) continue;
+                    int distance = ManhattanDistance(layout.Rooms[from].Center, layout.Rooms[to].Center);
+                    if (distance >= closestDistance) continue;
+                    closestFrom = from;
+                    closestTo = to;
+                    closestDistance = distance;
+                }
+
+                Connect(layout, layout.Rooms[closestFrom].Center, layout.Rooms[closestTo].Center,
+                    random.Next(2) == 0);
+                connected.Add(closestTo);
+            }
+        }
+
+        static int ManhattanDistance(Vector2Int a, Vector2Int b) =>
+            Math.Abs(a.x - b.x) + Math.Abs(a.y - b.y);
 
         static void AddRoom(DungeonLayout layout, RectInt bounds, System.Random random)
         {
