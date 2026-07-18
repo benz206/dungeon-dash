@@ -76,6 +76,7 @@ namespace DungeonDash
             if (hovered) GUI.color = previous * 1.15f;
             bool clicked = GUI.Button(rect, text, style);
             GUI.color = previous;
+            if (clicked) GameAudio.Play("ui_click", 0.5f);
             return clicked;
         }
 
@@ -88,6 +89,7 @@ namespace DungeonDash
             if (hovered) GUI.color = previous * 1.15f;
             bool clicked = GUI.Button(rect, text, style);
             GUI.color = previous;
+            if (clicked) GameAudio.Play("ui_click", 0.5f);
             return clicked;
         }
 

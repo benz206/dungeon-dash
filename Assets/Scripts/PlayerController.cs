@@ -122,6 +122,7 @@ namespace DungeonDash
             _dashUntil = Time.time + DashDuration;
             _nextDash = Time.time + DashCooldown;
             PixelBurst.DashDust(transform.position, _dashDirection);
+            GameAudio.Play("dash_whoosh", 0.6f);
         }
 
         void Animate()
@@ -156,6 +157,7 @@ namespace DungeonDash
             _knockbackUntil = Time.time + 0.14f;
             Health = Mathf.Max(0, Health - amount);
             FloatingDamageNumbers.Spawn(transform.position, amount, DamageNumberKind.PlayerHurt);
+            GameAudio.Play("player_hurt", 0.8f);
             GameFeel.Shake(0.4f);
             GameFeel.HitStop();
             if (Health == 0) _game.GameOver();

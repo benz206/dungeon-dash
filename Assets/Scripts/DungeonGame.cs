@@ -137,10 +137,12 @@ namespace DungeonDash
                 SetInventoryOpen(false);
                 _marketOpen = open;
                 if (_marketOpen) OpenMarket();
+                GameAudio.Play("ui_click", 0.5f);
             }
             if (keyboard.escapeKey.wasPressedThisFrame)
             {
                 SetInventoryOpen(false);
+                if (_marketOpen) GameAudio.Play("ui_click", 0.5f);
                 _marketOpen = false;
             }
         }
@@ -149,6 +151,7 @@ namespace DungeonDash
         {
             if (_inventoryOpen == open) return;
             _inventoryOpen = open;
+            GameAudio.Play("ui_click", 0.5f);
             if (open)
             {
                 _marketOpen = false;
@@ -321,6 +324,7 @@ namespace DungeonDash
                 _enemies.Add(enemy);
             }
             Toast($"Wave {_wave}");
+            GameAudio.Play("wave_start", 0.7f);
         }
 
         public void EnemyDied(EnemyActor enemy)
@@ -393,6 +397,7 @@ namespace DungeonDash
                     break;
                 case PickupKind.Chest:
                     AddCoins(8 + _wave);
+                    GameAudio.Play("chest_open", 0.6f);
                     Toast($"Chest: +{8 + _wave} coins");
                     break;
                 case PickupKind.Bomb:
@@ -404,12 +409,14 @@ namespace DungeonDash
                         hit++;
                     }
                     PixelBurst.BombBurst(PlayerPosition);
+                    GameAudio.Play("bomb_explode", 1f);
                     GameFeel.Shake(0.6f);
                     GameFeel.HitStop(0.09f);
                     Toast($"Bomb blast hit {hit} enemies");
                     break;
                 case PickupKind.Artifact:
                     _save.inventory.Add(artifact);
+                    GameAudio.Play("artifact_drop", 0.6f);
                     Toast($"Found {artifact.rarity} {artifact.displayName} ({artifact.quality})");
                     break;
             }
@@ -433,12 +440,14 @@ namespace DungeonDash
             var go = CreateSprite(critical ? "Critical shot" : "Shot", sprite, position, 12);
             go.transform.localScale = Vector3.one * (critical ? 0.7f : 0.55f);
             go.AddComponent<ProjectileActor>().Setup(this, direction, damage, critical);
+            GameAudio.Play("bow_shot", 0.6f);
         }
 
         void MeleeStrike(Vector2 position, Vector2 direction, int damage, Sprite sprite, bool critical)
         {
             var visual = CreateSprite(critical ? "Critical melee swing" : "Melee swing", sprite, position, 13);
             visual.AddComponent<MeleeSwingActor>().Setup(direction, critical);
+            GameAudio.Play("swing_whoosh", 0.6f);
 
             EnemyActor target = null;
             float closest = 1.45f * 1.45f;
@@ -480,6 +489,7 @@ namespace DungeonDash
         public void GameOver()
         {
             _gameOver = true;
+            GameAudio.Play("game_over", 0.8f);
             Save();
         }
 
@@ -1211,10 +1221,12 @@ namespace DungeonDash
             FloatingDamageNumbers.Spawn(transform.position, damage,
                 critical ? DamageNumberKind.Critical : DamageNumberKind.Normal);
             PixelBurst.HitSpark(transform.position, ((Vector2)transform.position - sourcePosition).normalized, critical);
+            GameAudio.Play(critical ? "crit_impact" : "hit_impact", 0.8f);
             if (critical) GameFeel.Shake(0.22f);
             if (_health > 0) return;
             _game.EnemyDied(this);
             PixelBurst.EnemyDeathPuff(transform.position, _skin.id);
+            GameAudio.Play("enemy_die", 0.8f);
             GameFeel.Shake(0.14f);
             gameObject.AddComponent<CorpseFade>().Begin(_renderer);
             Destroy(_navigator);
@@ -1320,8 +1332,8 @@ namespace DungeonDash
             transform.localScale = Vector3.one * (1f + Mathf.Sin(Time.time * 5f) * 0.07f);
             if (((Vector2)transform.position - _game.PlayerPosition).sqrMagnitude < 0.7f * 0.7f)
             {
-                if (_kind == PickupKind.Coin) PixelBurst.CoinSparkle(transform.position);
-                else if (_kind == PickupKind.Potion) PixelBurst.PotionGlint(transform.position);
+                if (_kind == PickupKind.Coin) { PixelBurst.CoinSparkle(transform.position); GameAudio.Play("coin", 0.5f); }
+                else if (_kind == PickupKind.Potion) { PixelBurst.PotionGlint(transform.position); GameAudio.Play("potion", 0.5f); }
                 _game.Collect(_kind, _artifact);
                 Destroy(gameObject);
             }
