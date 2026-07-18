@@ -332,8 +332,12 @@ namespace DungeonDash
             reserved.Add(basePos);
         }
 
-        // Unity addition, not present in Level.gd: guarantees each non-first room gets a banner
-        // on its north wall (if a valid, unreserved "north" cell exists), cycling through colors.
+        // Unity addition, not present in Level.gd: tries to give each non-first room a banner on its
+        // north wall, cycling through colors. Candidate cells must pass the SAME gates as every
+        // probabilistic decoration in PlanDecorations: Classify(...) == "north" AND IsStraightFrontWall
+        // (floor below, below-left and below-right), so banners never stick to corner/edge cells.
+        // AlternatingXs yields center-first with strictly increasing distance, so the first cell that
+        // passes both gates is the center-most one. If no top-wall cell qualifies, the room is skipped.
         static void ApplyBannerGuarantee(Func<Vector2Int, bool> walkable, RectInt gridBounds,
             IReadOnlyList<RectInt> roomBounds, Dictionary<Vector2Int, WallDecoration> decorations, HashSet<Vector2Int> reserved)
         {
@@ -356,6 +360,7 @@ namespace DungeonDash
                     bool deep = IsDeepWall(walkable, cell);
                     int hash = StableHash(cell - origin, 17);
                     if (Classify(mask, deep, hash) != "north") continue;
+                    if (!IsStraightFrontWall(walkable, cell)) continue;
 
                     found = cell;
                     break;

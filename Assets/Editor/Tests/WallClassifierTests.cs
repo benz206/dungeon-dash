@@ -148,8 +148,42 @@ namespace DungeonDashTests
 
             var banners = decorations.Where(entry => entry.Value.Kind == WallDecorationKind.Banner).ToList();
             Assert.That(banners, Has.Count.EqualTo(1));
+            // room1 spans x in [20,24]; center-most top-wall cell that passes both gates is x=22.
             Assert.That(banners[0].Key, Is.EqualTo(new Vector2Int(22, 3)));
             Assert.That(banners[0].Value.SpriteName, Is.EqualTo("wall_banner_blue"));
+            // A guaranteed banner must only land on a straight front wall, never a corner/edge cell.
+            Assert.That(WallClassifier.IsStraightFrontWall(Walkable, banners[0].Key), Is.True,
+                "guaranteed banner placed on a non-straight front wall");
+        }
+
+        [Test]
+        public void PlanDecorations_SkipsBannerGuaranteeOnNonStraightFrontNorthWall()
+        {
+            // room1 is a single-column room: its only top-wall cell (10,3) classifies as "north"
+            // (floor directly below, none above/beside) but is NOT a straight front wall, because
+            // the below-left/below-right diagonals are empty. This is exactly the corner/edge case
+            // the old ApplyBannerGuarantee force-placed a banner onto. No decoration of any kind
+            // should land there now.
+            var room0 = new RectInt(0, 0, 5, 3);
+            var room1 = new RectInt(10, 0, 1, 3);
+            var gridBounds = new RectInt(-1, -1, 16, 7);
+            bool Walkable(Vector2Int c) => InBounds(room0, c) || InBounds(room1, c);
+
+            var trap = new Vector2Int(10, 3);
+            Assert.That(WallClassifier.SpriteName(Walkable, trap, new Vector2Int(gridBounds.xMin, gridBounds.yMin)),
+                Is.EqualTo("wall_top_mid"), "precondition: trap cell classifies as north");
+            Assert.That(WallClassifier.IsStraightFrontWall(Walkable, trap), Is.False,
+                "precondition: trap cell is not a straight front wall");
+
+            var decorations = WallClassifier.PlanDecorations(Walkable, gridBounds, new[] { room0, room1 });
+
+            Assert.That(decorations.ContainsKey(trap), Is.False,
+                "no decoration should be forced onto the non-straight-front north cell");
+
+            // Broader invariant: every banner (guaranteed or probabilistic) sits on a straight front wall.
+            foreach (var pair in decorations.Where(entry => entry.Value.Kind == WallDecorationKind.Banner))
+                Assert.That(WallClassifier.IsStraightFrontWall(Walkable, pair.Key), Is.True,
+                    $"{pair.Key} banner placed on a non-straight front wall");
         }
     }
 }
