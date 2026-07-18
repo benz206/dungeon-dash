@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using static DungeonDash.UiTheme;
 
 namespace DungeonDash
 {
@@ -599,15 +600,19 @@ namespace DungeonDash
         void InitStyles()
         {
             if (_titleStyle != null) return;
-            _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 30, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 24, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            _titleStyle.font = TitleFont;
             _titleStyle.normal.textColor = new Color(0.91f, 0.94f, 0.98f);
-            _toastStyle = new GUIStyle(_titleStyle) { fontSize = 21 };
+            _toastStyle = new GUIStyle(_titleStyle) { fontSize = 21, fontStyle = FontStyle.Normal };
+            _toastStyle.font = BodyFont;
             _toastStyle.normal.textColor = new Color(0.72f, 0.85f, 0.95f);
             _labelStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, wordWrap = true };
+            _labelStyle.font = BodyFont;
             _labelStyle.normal.textColor = Color.white;
-            _smallStyle = new GUIStyle(_labelStyle) { fontSize = 14 };
+            _smallStyle = new GUIStyle(_labelStyle) { fontSize = 16 };
             _smallStyle.normal.textColor = new Color(0.76f, 0.81f, 0.9f);
-            _buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 16, fixedHeight = 38 };
+            _buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 18, fixedHeight = 38 };
+            _buttonStyle.font = BodyFont;
             _buttonStyle.normal.background = _catalog.buttonUp.texture;
             _buttonStyle.active.background = _catalog.buttonDown.texture;
             _dangerButtonStyle = new GUIStyle(_buttonStyle);
@@ -652,11 +657,11 @@ namespace DungeonDash
             }
 
             var statusRect = new Rect(18, 18, 440, 112);
-            DrawRect(statusRect, new Color(0.018f, 0.028f, 0.045f, 0.96f));
-            DrawBorder(statusRect, new Color(0.19f, 0.28f, 0.38f, 0.9f), 1f);
+            SubPanel(statusRect);
+            DrawRect(new Rect(statusRect.x, statusRect.y, statusRect.width, 3), new Color(0.35f, 0.6f, 0.72f, 0.85f));
             if (_player != null) DrawHearts(new Rect(28, 28, 30, 30));
             if (_catalog.coins.Length > 0)
-                GUI.DrawTexture(new Rect(27, 60, 22, 22), _catalog.coins[0].texture, ScaleMode.ScaleToFit, true);
+                DrawSprite(new Rect(27, 60, 22, 22), _catalog.coins[0]);
             GUI.Label(new Rect(53, 59, 380, 25), $"{_save.coins}     WAVE {_wave}     {_kills} KILLS", _sectionStyle);
             if (_equipped != null)
             {
@@ -665,19 +670,25 @@ namespace DungeonDash
             }
 
             float menuX = _uiWidth - 354f;
-            if (GUI.Button(new Rect(menuX, 20, 160, 40), "VAULT  [I]", _buttonStyle))
+            if (Button(new Rect(menuX, 20, 160, 40), "VAULT  [I]", _buttonStyle))
             {
                 SetInventoryOpen(true);
             }
-            if (GUI.Button(new Rect(menuX + 170, 20, 160, 40), "MARKET  [M]", _buttonStyle))
+            if (Button(new Rect(menuX + 170, 20, 160, 40), "MARKET  [M]", _buttonStyle))
             {
                 _marketOpen = true;
                 OpenMarket();
             }
-            GUI.Label(new Rect(menuX, 67, 330, 46), "WASD MOVE  ·  LMB ATTACK  ·  RMB DASH", _centerStyle);
 
             if (Time.time < _toastUntil)
-                GUI.Label(new Rect(_uiWidth / 2f - 300, 72, 600, 36), _toast, _toastStyle);
+            {
+                var toastRect = new Rect(_uiWidth / 2f - 300, 72, 600, 36);
+                SubPanel(toastRect);
+                GUI.Label(toastRect, _toast, _toastStyle);
+            }
+            GUI.Label(new Rect(0, _uiHeight - 30, _uiWidth, 24),
+                "WASD MOVE   ·   LMB / SPACE ATTACK   ·   RMB DASH   ·   I INVENTORY   ·   M MARKET   ·   ESC CLOSE",
+                _centerStyle);
             if (_gameOver) DrawGameOver();
             GUI.matrix = previousMatrix;
         }
@@ -688,7 +699,7 @@ namespace DungeonDash
             {
                 int health = _player.Health - i * 2;
                 var sprite = health >= 2 ? _catalog.heartFull : health == 1 ? _catalog.heartHalf : _catalog.heartEmpty;
-                GUI.DrawTexture(new Rect(start.x + i * 28, start.y, 24, 24), sprite.texture, ScaleMode.ScaleToFit, true);
+                DrawSprite(new Rect(start.x + i * 28, start.y, 24, 24), sprite);
             }
         }
 
@@ -703,9 +714,9 @@ namespace DungeonDash
             GUI.Label(new Rect(rect.x + 480, rect.y + 29, rect.width - 514, 28), "DELVER REGISTRY  /  CHOOSE YOUR OPERATIVE", _rightStyle);
 
             var metaRect = new Rect(rect.x + 34, rect.y + 76, rect.width - 68, 44);
-            DrawRect(metaRect, new Color(0.04f, 0.06f, 0.085f, 0.98f));
+            SubPanel(metaRect);
             if (_catalog.coins.Length > 0)
-                GUI.DrawTexture(new Rect(metaRect.x + 14, metaRect.y + 10, 24, 24), _catalog.coins[0].texture, ScaleMode.ScaleToFit, true);
+                DrawSprite(new Rect(metaRect.x + 14, metaRect.y + 10, 24, 24), _catalog.coins[0]);
             GUI.Label(new Rect(metaRect.x + 44, metaRect.y, 220, metaRect.height), $"{_save.coins} BANKED", _sectionStyle);
             GUI.Label(new Rect(metaRect.x + 274, metaRect.y, 240, metaRect.height), $"{_save.inventory.Count} ARTIFACTS", _sectionStyle);
             GUI.Label(new Rect(metaRect.x + 530, metaRect.y, 500, metaRect.height),
@@ -713,8 +724,7 @@ namespace DungeonDash
 
             var rosterRect = new Rect(rect.x + 34, rect.y + 138, 706, 468);
             var detailRect = new Rect(rect.x + 758, rect.y + 138, 328, 468);
-            DrawRect(rosterRect, new Color(0.025f, 0.038f, 0.057f, 0.98f));
-            DrawBorder(rosterRect, new Color(0.12f, 0.18f, 0.25f), 1f);
+            SubPanel(rosterRect);
 
             const float gap = 10f;
             const float cardWidth = 219f;
@@ -731,7 +741,7 @@ namespace DungeonDash
                 DrawRect(new Rect(card.x, card.y, 3f, card.height), selected ? new Color(0.5f, 0.75f, 0.86f) : new Color(0.18f, 0.27f, 0.34f));
                 if (selected) DrawBorder(card, new Color(0.32f, 0.49f, 0.6f), 1f);
                 var preview = new Rect(card.x + 10f, card.y + 8f, 76f, 86f);
-                GUI.DrawTexture(preview, skin.idle[0].texture, ScaleMode.ScaleToFit, true);
+                DrawSprite(preview, skin.idle[0]);
                 GUI.Label(new Rect(card.x + 92, card.y + 15, card.width - 102, 23), CharacterName(skin.id).ToUpperInvariant(), _smallStyle);
                 GUI.Label(new Rect(card.x + 92, card.y + 40, card.width - 102, 20),
                     $"{CharacterRole(skin.id).ToUpperInvariant()}  /  {CharacterVariant(skin.id)}", _microStyle);
@@ -744,15 +754,14 @@ namespace DungeonDash
 
         void DrawCharacterDetails(Rect rect, GameCatalog.CharacterSkin skin)
         {
-            DrawRect(rect, new Color(0.03f, 0.045f, 0.065f, 0.99f));
-            DrawBorder(rect, new Color(0.15f, 0.23f, 0.3f), 1f);
+            SubPanel(rect);
             GUI.Label(new Rect(rect.x + 24, rect.y + 18, rect.width - 48, 22),
                 $"{CharacterRole(skin.id).ToUpperInvariant()}  /  APPEARANCE {CharacterVariant(skin.id)}", _sectionStyle);
 
             var preview = new Rect(rect.x + 74, rect.y + 51, 180, 184);
             DrawRect(preview, new Color(0.018f, 0.027f, 0.04f));
             DrawBorder(preview, new Color(0.22f, 0.34f, 0.43f), 1f);
-            GUI.DrawTexture(new Rect(preview.x + 15, preview.y + 11, 150, 162), skin.idle[0].texture, ScaleMode.ScaleToFit, true);
+            DrawSprite(new Rect(preview.x + 15, preview.y + 11, 150, 162), skin.idle[0]);
 
             GUI.Label(new Rect(rect.x + 22, rect.y + 248, rect.width - 44, 34), CharacterName(skin.id).ToUpperInvariant(), _titleStyle);
             GUI.Label(new Rect(rect.x + 26, rect.y + 291, rect.width - 52, 44), CharacterDescription(skin.id), _centerStyle);
@@ -762,7 +771,7 @@ namespace DungeonDash
             DrawRect(bar, new Color(0.012f, 0.02f, 0.03f));
             DrawRect(new Rect(bar.x, bar.y, bar.width * Mathf.InverseLerp(4f, 6f, skin.speed), bar.height), new Color(0.42f, 0.68f, 0.79f));
 
-            if (GUI.Button(new Rect(rect.x + 26, rect.yMax - 60, rect.width - 52, 40), "ENTER THE DUNGEON", _buttonStyle))
+            if (Button(new Rect(rect.x + 26, rect.yMax - 60, rect.width - 52, 40), "ENTER THE DUNGEON", _buttonStyle))
                 StartRun(skin);
         }
 
@@ -809,19 +818,18 @@ namespace DungeonDash
             GUI.Label(new Rect(rect.x + 30, rect.y + 18, 500, 38), "THE VAULT", _titleStyle);
             GUI.Label(new Rect(rect.x + 32, rect.y + 58, 570, 22), "LOADOUT & ARTIFACTS  ·  STRONGEST FINDS FIRST", _sectionStyle);
             if (_catalog.coins.Length > 0)
-                GUI.DrawTexture(new Rect(rect.x + 656, rect.y + 29, 22, 22), _catalog.coins[0].texture, ScaleMode.ScaleToFit, true);
+                DrawSprite(new Rect(rect.x + 656, rect.y + 29, 22, 22), _catalog.coins[0]);
             GUI.Label(new Rect(rect.x + 684, rect.y + 25, 196, 32), $"{_save.coins}  ·  {_save.inventory.Count} ARTIFACTS", _rightStyle);
-            if (GUI.Button(new Rect(rect.xMax - 164, rect.y + 20, 132, 38), "RESUME  [I]", _buttonStyle)) SetInventoryOpen(false);
+            if (Button(new Rect(rect.xMax - 164, rect.y + 20, 132, 38), "RESUME  [I]", _buttonStyle)) SetInventoryOpen(false);
 
             var listRect = new Rect(rect.x + 30, rect.y + 96, 590, 500);
             var detailRect = new Rect(rect.x + 640, rect.y + 96, 410, 500);
-            DrawRect(listRect, new Color(0.027f, 0.045f, 0.075f, 0.98f));
-            DrawBorder(listRect, new Color(0.12f, 0.21f, 0.34f), 1f);
+            SubPanel(listRect);
             DrawRect(new Rect(listRect.x, listRect.y, listRect.width, 64), new Color(0.045f, 0.07f, 0.105f));
             var hero = _catalog.characters.FirstOrDefault(x => x.id == _save.characterId);
             if (hero != null)
             {
-                GUI.DrawTexture(new Rect(listRect.x + 10, listRect.y + 4, 54, 56), hero.idle[0].texture, ScaleMode.ScaleToFit, true);
+                DrawSprite(new Rect(listRect.x + 10, listRect.y + 4, 54, 56), hero.idle[0]);
                 GUI.Label(new Rect(listRect.x + 73, listRect.y + 8, 250, 23), CharacterName(hero.id).ToUpperInvariant(), _smallStyle);
                 GUI.Label(new Rect(listRect.x + 73, listRect.y + 32, 250, 20), $"{CharacterRole(hero.id).ToUpperInvariant()}  ·  ACTIVE DELVER", _microStyle);
             }
@@ -845,7 +853,7 @@ namespace DungeonDash
                 DrawRect(new Rect(row.x, row.y, 4, row.height), RarityColor(artifact.rarity));
                 if (selected) DrawBorder(row, new Color(0.27f, 0.68f, 1f), 1f);
                 var sprite = WeaponSprite(artifact.weaponId);
-                if (sprite != null) GUI.DrawTexture(new Rect(row.x + 15, row.y + 10, 52, 52), sprite.texture, ScaleMode.ScaleToFit, true);
+                DrawSprite(new Rect(row.x + 15, row.y + 10, 52, 52), sprite);
                 GUI.Label(new Rect(row.x + 80, row.y + 8, row.width - 178, 27), $"{artifact.rarity.ToUpperInvariant()}  {artifact.displayName}", _labelStyle);
                 GUI.Label(new Rect(row.x + 80, row.y + 38, row.width - 170, 22), artifact.Stats, _mutedStyle);
                 GUI.Label(new Rect(row.xMax - 88, row.y + 8, 72, 24), $"Q{artifact.quality}", _rightStyle);
@@ -859,8 +867,7 @@ namespace DungeonDash
 
         void DrawArtifactDetails(Rect rect, Artifact artifact)
         {
-            DrawRect(rect, new Color(0.035f, 0.055f, 0.09f, 0.99f));
-            DrawBorder(rect, new Color(0.13f, 0.24f, 0.39f), 1f);
+            SubPanel(rect);
             if (artifact == null)
             {
                 GUI.Label(new Rect(rect.x + 30, rect.center.y - 20, rect.width - 60, 40), "SELECT AN ARTIFACT", _centerStyle);
@@ -876,7 +883,7 @@ namespace DungeonDash
             var preview = new Rect(rect.x + 26, rect.y + 86, 112, 112);
             DrawRect(preview, new Color(0.02f, 0.035f, 0.06f));
             DrawBorder(preview, new Color(rarity.r, rarity.g, rarity.b, 0.65f), 2f);
-            if (sprite != null) GUI.DrawTexture(new Rect(preview.x + 14, preview.y + 14, 84, 84), sprite.texture, ScaleMode.ScaleToFit, true);
+            DrawSprite(new Rect(preview.x + 14, preview.y + 14, 84, 84), sprite);
 
             GUI.Label(new Rect(rect.x + 160, rect.y + 88, rect.width - 184, 22), "ROLL QUALITY", _microStyle);
             GUI.Label(new Rect(rect.x + 160, rect.y + 111, rect.width - 184, 43), $"{artifact.quality}", _titleStyle);
@@ -893,9 +900,9 @@ namespace DungeonDash
             bool equipped = artifact.id == _equipped.id;
             GUI.enabled = !equipped;
             string equipLabel = equipped ? "EQUIPPED" : "EQUIP ARTIFACT";
-            if (GUI.Button(new Rect(rect.x + 24, rect.yMax - 86, 174, 42), equipLabel, _buttonStyle)) Equip(artifact);
+            if (Button(new Rect(rect.x + 24, rect.yMax - 86, 174, 42), equipLabel, _buttonStyle)) Equip(artifact);
             GUI.enabled = !equipped && !_onlineMarket.Busy;
-            if (GUI.Button(new Rect(rect.x + 212, rect.yMax - 86, 174, 42), $"LIST  ·  {artifact.Price}", _dangerButtonStyle)) ListArtifact(artifact);
+            if (Button(new Rect(rect.x + 212, rect.yMax - 86, 174, 42), $"LIST  ·  {artifact.Price}", _dangerButtonStyle)) ListArtifact(artifact);
             GUI.enabled = true;
             GUI.Label(new Rect(rect.x + 24, rect.yMax - 36, rect.width - 48, 20),
                 equipped ? "Equip another artifact before listing this one." : "Listing moves this artifact to the global market.", _centerStyle);
@@ -912,64 +919,73 @@ namespace DungeonDash
 
         void DrawMarket()
         {
-            var rect = Centered(820, 690);
+            DrawBackdrop();
+            var rect = Centered(860, 660);
             Panel(rect);
-            GUILayout.BeginArea(new Rect(rect.x + 25, rect.y + 18, rect.width - 50, rect.height - 36));
-            GUILayout.Label("GLOBAL ARTIFACT MARKET", _titleStyle);
-            GUILayout.Label(_onlineMarket.Status, _smallStyle);
+            DrawRect(new Rect(rect.x, rect.y, rect.width, 6), new Color(0.34f, 0.62f, 0.46f));
+            GUI.Label(new Rect(rect.x + 30, rect.y + 18, 520, 38), "GLOBAL MARKET", _titleStyle);
+            GUI.Label(new Rect(rect.x + 32, rect.y + 58, rect.width - 220, 22), _onlineMarket.Status, _sectionStyle);
+            if (Button(new Rect(rect.xMax - 164, rect.y + 20, 132, 38), "CLOSE  [M]", _buttonStyle)) _marketOpen = false;
+
             string pending = _useOnlineMarket && _onlineMarket.PendingCoins > 0
-                ? $" · {_onlineMarket.PendingCoins} proceeds ready"
-                : string.Empty;
-            GUILayout.Label($"Balance: {_save.coins} coins{pending}", _labelStyle);
-            GUILayout.BeginHorizontal();
+                ? $"  ·  {_onlineMarket.PendingCoins} PROCEEDS READY" : string.Empty;
+            if (_catalog.coins.Length > 0)
+                DrawSprite(new Rect(rect.x + 30, rect.y + 84, 22, 22), _catalog.coins[0]);
+            GUI.Label(new Rect(rect.x + 58, rect.y + 82, rect.width - 90, 26), $"{_save.coins} COINS{pending}", _smallStyle);
+
+            float actionY = rect.y + 118;
             GUI.enabled = !_onlineMarket.Busy;
             if (_useOnlineMarket)
             {
-                if (GUILayout.Button("Refresh", _buttonStyle)) RefreshOnlineMarket();
-                if (GUILayout.Button("Claim proceeds", _buttonStyle)) ClaimOnlineMarket();
+                if (Button(new Rect(rect.x + 30, actionY, 150, 34), "REFRESH", _buttonStyle)) RefreshOnlineMarket();
+                if (Button(new Rect(rect.x + 190, actionY, 190, 34), "CLAIM PROCEEDS", _buttonStyle)) ClaimOnlineMarket();
             }
-            else if (GUILayout.Button("Retry online", _buttonStyle)) OpenMarket();
+            else if (Button(new Rect(rect.x + 30, actionY, 160, 34), "RETRY ONLINE", _buttonStyle)) OpenMarket();
             GUI.enabled = true;
-            GUILayout.EndHorizontal();
-            _marketScroll = GUILayout.BeginScrollView(_marketScroll);
-            var listings = _useOnlineMarket ? _onlineMarket.Listings : _localMarket.Listings;
-            foreach (var listing in listings.ToArray())
+
+            var listRect = new Rect(rect.x + 30, actionY + 48, rect.width - 60, rect.yMax - (actionY + 48) - 26);
+            SubPanel(listRect);
+            var listings = (_useOnlineMarket ? _onlineMarket.Listings : _localMarket.Listings).ToArray();
+            var viewport = new Rect(listRect.x + 8, listRect.y + 8, listRect.width - 16, listRect.height - 16);
+            const float rowHeight = 68f;
+            float contentHeight = Mathf.Max(viewport.height - 1f, listings.Length * rowHeight);
+            _marketScroll = GUI.BeginScrollView(viewport, _marketScroll,
+                new Rect(0, 0, viewport.width - 18f, contentHeight));
+            for (int i = 0; i < listings.Length; i++)
             {
+                var listing = listings[i];
                 var artifact = listing.artifact;
-                GUILayout.BeginHorizontal(GUI.skin.box);
-                GUILayout.Label(new GUIContent(WeaponSprite(artifact.weaponId).texture), GUILayout.Width(48), GUILayout.Height(48));
-                GUILayout.BeginVertical();
-                GUILayout.Label($"{artifact.rarity} {artifact.displayName} · Q{artifact.quality}", _labelStyle);
-                GUILayout.Label(artifact.Stats + $" · {listing.price} coins", _smallStyle);
-                GUILayout.EndVertical();
-                if (IsOwnListing(listing))
+                var row = new Rect(0, i * rowHeight, viewport.width - 22f, rowHeight - 8f);
+                bool hovered = row.Contains(Event.current.mousePosition);
+                DrawRect(row, hovered ? new Color(0.06f, 0.1f, 0.16f) : new Color(0.04f, 0.065f, 0.105f));
+                DrawRect(new Rect(row.x, row.y, 4, row.height), RarityColor(artifact.rarity));
+                DrawSprite(new Rect(row.x + 15, row.y + 6, 48, 48), WeaponSprite(artifact.weaponId));
+                GUI.Label(new Rect(row.x + 76, row.y + 4, row.width - 260, 25), $"{artifact.rarity.ToUpperInvariant()}  {artifact.displayName}", _labelStyle);
+                GUI.Label(new Rect(row.x + 76, row.y + 32, row.width - 260, 22), $"{artifact.Stats}  ·  Q{artifact.quality}", _mutedStyle);
+                GUI.Label(new Rect(row.xMax - 190, row.y + 4, 92, 24), $"{listing.price} COINS", _rightStyle);
+
+                bool own = IsOwnListing(listing);
+                var buttonRect = new Rect(row.xMax - 92, row.y + 16, 82, 32);
+                GUI.enabled = own ? !_onlineMarket.Busy : !_onlineMarket.Busy && _save.coins >= listing.price;
+                if (Button(buttonRect, own ? "CANCEL" : "BUY", own ? _dangerButtonStyle : _buttonStyle))
                 {
-                    GUI.enabled = !_onlineMarket.Busy;
-                    if (GUILayout.Button("Cancel", _buttonStyle, GUILayout.Width(90))) CancelListing(listing);
-                    GUI.enabled = true;
+                    if (own) CancelListing(listing); else BuyListing(listing);
                 }
-                else
-                {
-                    GUI.enabled = !_onlineMarket.Busy && _save.coins >= listing.price;
-                    if (GUILayout.Button("Buy", _buttonStyle, GUILayout.Width(90))) BuyListing(listing);
-                    GUI.enabled = true;
-                }
-                GUILayout.EndHorizontal();
+                GUI.enabled = true;
             }
-            GUILayout.EndScrollView();
-            if (GUILayout.Button("Close (M)", _buttonStyle)) _marketOpen = false;
-            GUILayout.EndArea();
+            GUI.EndScrollView();
         }
 
         void DrawGameOver()
         {
+            DrawBackdrop();
             var rect = Centered(480, 260);
             Panel(rect);
             GUILayout.BeginArea(new Rect(rect.x + 30, rect.y + 25, rect.width - 60, rect.height - 50));
             GUILayout.Label("RUN ENDED", _titleStyle);
             GUILayout.Label($"Reached wave {_wave} with {_kills} kills.\nArtifacts and coins are saved.", _labelStyle);
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Choose Hero & Run Again", _dangerButtonStyle)) Restart();
+            if (LayoutButton("Choose Hero & Run Again", _dangerButtonStyle)) Restart();
             GUILayout.EndArea();
         }
 
@@ -1111,41 +1127,13 @@ namespace DungeonDash
             }
         }
 
-        void Panel(Rect rect)
-        {
-            DrawRect(rect, new Color(0.025f, 0.04f, 0.07f, 0.99f));
-            DrawBorder(rect, new Color(0.15f, 0.27f, 0.44f), 2f);
-        }
+        void Panel(Rect rect) => DrawPanel(rect);
 
         void DrawBackdrop()
         {
             DrawRect(new Rect(0, 0, _uiWidth, _uiHeight), new Color(0.008f, 0.015f, 0.03f, 0.82f));
             DrawRect(new Rect(0, 0, _uiWidth, 4), new Color(0.13f, 0.48f, 0.78f, 0.8f));
         }
-
-        static void DrawRect(Rect rect, Color color)
-        {
-            var previous = GUI.color;
-            GUI.color = color;
-            GUI.DrawTexture(rect, Texture2D.whiteTexture);
-            GUI.color = previous;
-        }
-
-        static void DrawBorder(Rect rect, Color color, float thickness)
-        {
-            DrawRect(new Rect(rect.x, rect.y, rect.width, thickness), color);
-            DrawRect(new Rect(rect.x, rect.yMax - thickness, rect.width, thickness), color);
-            DrawRect(new Rect(rect.x, rect.y, thickness, rect.height), color);
-            DrawRect(new Rect(rect.xMax - thickness, rect.y, thickness, rect.height), color);
-        }
-
-        static Color RarityColor(string rarity) => rarity switch
-        {
-            "Mythic" => new Color(1f, 0.58f, 0.18f),
-            "Epic" => new Color(0.72f, 0.4f, 1f),
-            "Rare" => new Color(0.2f, 0.68f, 1f),
-            _ => new Color(0.55f, 0.65f, 0.74f)
-        };
 
         Rect Centered(float width, float height) =>
             new((_uiWidth - width) / 2f, (_uiHeight - height) / 2f, width, height);
