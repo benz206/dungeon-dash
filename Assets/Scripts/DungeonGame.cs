@@ -403,6 +403,9 @@ namespace DungeonDash
                         enemy.TakeDamage(12 + _wave * 2);
                         hit++;
                     }
+                    PixelBurst.BombBurst(PlayerPosition);
+                    GameFeel.Shake(0.6f);
+                    GameFeel.HitStop(0.09f);
                     Toast($"Bomb blast hit {hit} enemies");
                     break;
                 case PickupKind.Artifact:
@@ -429,7 +432,7 @@ namespace DungeonDash
         {
             var go = CreateSprite(critical ? "Critical shot" : "Shot", sprite, position, 12);
             go.transform.localScale = Vector3.one * (critical ? 0.7f : 0.55f);
-            go.AddComponent<ProjectileActor>().Setup(this, direction, damage);
+            go.AddComponent<ProjectileActor>().Setup(this, direction, damage, critical);
         }
 
         void MeleeStrike(Vector2 position, Vector2 direction, int damage, Sprite sprite, bool critical)
@@ -448,7 +451,7 @@ namespace DungeonDash
                 closest = distance;
                 target = enemy;
             }
-            target?.TakeDamage(damage, position - direction * 0.75f);
+            target?.TakeDamage(damage, position - direction * 0.75f, critical);
         }
 
         public EnemyActor ProjectileTarget(Vector2 position)
@@ -655,6 +658,8 @@ namespace DungeonDash
                 GUI.matrix = previousMatrix;
                 return;
             }
+
+            FloatingDamageNumbers.Draw(Camera.main, scale);
 
             var statusRect = new Rect(18, 18, 440, 112);
             SubPanel(statusRect);
@@ -1149,6 +1154,8 @@ namespace DungeonDash
 
     public sealed class EnemyActor : MonoBehaviour
     {
+        const float SpawnTelegraphDuration = 0.18f;
+
         DungeonGame _game;
         GameCatalog.EnemySkin _skin;
         SpriteRenderer _renderer;
@@ -1157,6 +1164,7 @@ namespace DungeonDash
         float _animationTime;
         float _flashUntil;
         float _invulnerableUntil;
+        float _spawnTime;
 
         public void Setup(DungeonGame game, GameCatalog.EnemySkin skin, int health)
         {
@@ -1165,6 +1173,7 @@ namespace DungeonDash
             _health = health;
             _renderer = GetComponent<SpriteRenderer>();
             _navigator = GetComponent<EnemyNavigator>();
+            _spawnTime = Time.time;
         }
 
         void Update()
@@ -1172,6 +1181,9 @@ namespace DungeonDash
             _renderer.color = Time.time < _flashUntil
                 ? new Color(3.5f, 3.5f, 3.5f, 1f)
                 : Color.white;
+            float spawnT = Mathf.Clamp01((Time.time - _spawnTime) / SpawnTelegraphDuration);
+            transform.localScale = Vector3.one * spawnT;
+            _renderer.sortingOrder = YSort.Order(transform.position.y, 1);
             if (!_game.PlayerAlive || !_game.WorldRunning) return;
             Vector2 delta = _game.PlayerPosition - (Vector2)transform.position;
             _renderer.flipX = delta.x < 0f;
@@ -1184,19 +1196,58 @@ namespace DungeonDash
 
         public void TakeDamage(int damage)
         {
-            TakeDamage(damage, _game == null ? transform.position : _game.PlayerPosition);
+            TakeDamage(damage, _game == null ? transform.position : _game.PlayerPosition, false);
         }
 
-        public void TakeDamage(int damage, Vector2 sourcePosition)
+        public void TakeDamage(int damage, Vector2 sourcePosition) => TakeDamage(damage, sourcePosition, false);
+
+        public void TakeDamage(int damage, Vector2 sourcePosition, bool critical)
         {
             if (Time.time < _invulnerableUntil) return;
             _invulnerableUntil = Time.time + 0.12f;
             _flashUntil = Time.time + 0.1f;
             _navigator?.KnockbackFrom(sourcePosition);
             _health -= damage;
+            FloatingDamageNumbers.Spawn(transform.position, damage,
+                critical ? DamageNumberKind.Critical : DamageNumberKind.Normal);
+            PixelBurst.HitSpark(transform.position, ((Vector2)transform.position - sourcePosition).normalized, critical);
+            if (critical) GameFeel.Shake(0.22f);
             if (_health > 0) return;
             _game.EnemyDied(this);
-            Destroy(gameObject);
+            PixelBurst.EnemyDeathPuff(transform.position, _skin.id);
+            GameFeel.Shake(0.14f);
+            gameObject.AddComponent<CorpseFade>().Begin(_renderer);
+            Destroy(_navigator);
+            Destroy(this);
+        }
+    }
+
+    // Keeps the sprite visible for a short fade after EnemyActor destroys itself, so
+    // FindObjectsByType<EnemyActor> reflects the kill immediately while the corpse lingers.
+    public sealed class CorpseFade : MonoBehaviour
+    {
+        const float FadeDuration = 0.35f;
+
+        SpriteRenderer _renderer;
+        float _startTime;
+
+        public void Begin(SpriteRenderer renderer)
+        {
+            _renderer = renderer;
+            _renderer.color = Color.white;
+            _startTime = Time.time;
+        }
+
+        void Update()
+        {
+            float t = (Time.time - _startTime) / FadeDuration;
+            if (t >= 1f)
+            {
+                Destroy(gameObject);
+                return;
+            }
+            _renderer.color = new Color(1f, 1f, 1f, 1f - t);
+            transform.localScale = Vector3.one * (1f - t * 0.25f);
         }
     }
 
@@ -1205,13 +1256,15 @@ namespace DungeonDash
         DungeonGame _game;
         Vector2 _direction;
         int _damage;
+        bool _critical;
         float _expires;
 
-        public void Setup(DungeonGame game, Vector2 direction, int damage)
+        public void Setup(DungeonGame game, Vector2 direction, int damage, bool critical = false)
         {
             _game = game;
             _direction = direction;
             _damage = damage;
+            _critical = critical;
             _expires = Time.time + 1.6f;
             transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 45f);
         }
@@ -1223,7 +1276,7 @@ namespace DungeonDash
             var target = _game.ProjectileTarget(transform.position);
             if (target != null)
             {
-                target.TakeDamage(_damage, transform.position - (Vector3)(_direction * 0.35f));
+                target.TakeDamage(_damage, transform.position - (Vector3)(_direction * 0.35f), _critical);
                 Destroy(gameObject);
             }
             else if (Time.time >= _expires) Destroy(gameObject);
@@ -1232,6 +1285,9 @@ namespace DungeonDash
 
     public sealed class PickupActor : MonoBehaviour
     {
+        const float MagnetRadius = 1.5f;
+        const float MagnetSpeed = 6f;
+
         DungeonGame _game;
         PickupKind _kind;
         Artifact _artifact;
@@ -1254,9 +1310,18 @@ namespace DungeonDash
             if (!_game.WorldRunning) return;
             if (_frames != null && _frames.Length > 0)
                 _renderer.sprite = _frames[Mathf.FloorToInt(Time.time * 8f) % _frames.Length];
+            _renderer.sortingOrder = YSort.Order(transform.position.y, 0);
+            if (_kind == PickupKind.Coin)
+            {
+                Vector2 toPlayer = _game.PlayerPosition - (Vector2)transform.position;
+                if (toPlayer.sqrMagnitude < MagnetRadius * MagnetRadius)
+                    transform.position = Vector2.MoveTowards(transform.position, _game.PlayerPosition, MagnetSpeed * Time.deltaTime);
+            }
             transform.localScale = Vector3.one * (1f + Mathf.Sin(Time.time * 5f) * 0.07f);
             if (((Vector2)transform.position - _game.PlayerPosition).sqrMagnitude < 0.7f * 0.7f)
             {
+                if (_kind == PickupKind.Coin) PixelBurst.CoinSparkle(transform.position);
+                else if (_kind == PickupKind.Potion) PixelBurst.PotionGlint(transform.position);
                 _game.Collect(_kind, _artifact);
                 Destroy(gameObject);
             }

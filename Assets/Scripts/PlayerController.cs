@@ -121,6 +121,7 @@ namespace DungeonDash
             _dashDirection = _move.sqrMagnitude > 0.01f ? _move.normalized : _aim;
             _dashUntil = Time.time + DashDuration;
             _nextDash = Time.time + DashCooldown;
+            PixelBurst.DashDust(transform.position, _dashDirection);
         }
 
         void Animate()
@@ -135,6 +136,8 @@ namespace DungeonDash
             _renderer.color = Time.time < _flashUntil
                 ? new Color(3.5f, 3.5f, 3.5f, 1f)
                 : Color.white;
+            _renderer.sortingOrder = YSort.Order(transform.position.y, 2);
+            if (_weaponRenderer != null) _weaponRenderer.sortingOrder = _renderer.sortingOrder + 1;
         }
 
         public void TakeDamage(int amount)
@@ -152,6 +155,9 @@ namespace DungeonDash
             _knockbackDirection = away.sqrMagnitude > 0.01f ? away.normalized : -_aim;
             _knockbackUntil = Time.time + 0.14f;
             Health = Mathf.Max(0, Health - amount);
+            FloatingDamageNumbers.Spawn(transform.position, amount, DamageNumberKind.PlayerHurt);
+            GameFeel.Shake(0.4f);
+            GameFeel.HitStop();
             if (Health == 0) _game.GameOver();
         }
 

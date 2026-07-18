@@ -19,7 +19,11 @@ namespace DungeonDash
             transform.position = new Vector3(Target.position.x, Target.position.y, transform.position.z);
         }
 
-        void LateUpdate() => CenterNow();
+        void LateUpdate()
+        {
+            CenterNow();
+            if (!Application.isBatchMode) transform.position += (Vector3)GameFeel.ShakeOffset;
+        }
     }
 
     public sealed class DungeonViewportSystem : MonoBehaviour
