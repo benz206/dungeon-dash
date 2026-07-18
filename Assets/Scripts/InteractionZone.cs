@@ -53,8 +53,8 @@ namespace DungeonDash
             Vector3 screen = Camera.main.WorldToScreenPoint(transform.position + Vector3.up * 0.9f);
             if (screen.z < 0f) return;
             var rect = new Rect(screen.x - 70f, Screen.height - screen.y - 22f, 140f, 26f);
-            UiTheme.DrawRect(rect, new Color(0.02f, 0.04f, 0.08f, 0.9f));
-            UiTheme.DrawBorder(rect, new Color(0.3f, 0.55f, 0.78f, 0.95f), 1f);
+            UiTheme.DrawRect(rect, new Color(0.055f, 0.065f, 0.085f, 0.94f));
+            UiTheme.DrawBorder(rect, UiTheme.AccentGold, 2f);
             GUI.Label(rect, $"[E] {_label}", _promptStyle);
         }
     }

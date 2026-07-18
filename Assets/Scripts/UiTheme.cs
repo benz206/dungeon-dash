@@ -5,11 +5,14 @@ namespace DungeonDash
     /// Shared IMGUI palette, pixel fonts and drawing helpers for the DungeonGame UI.
     public static class UiTheme
     {
-        public static readonly Color PanelFill = new(0.028f, 0.043f, 0.072f, 0.99f);
-        public static readonly Color PanelBorder = new(0.16f, 0.29f, 0.46f, 1f);
-        public static readonly Color PanelShadow = new(0f, 0f, 0f, 0.4f);
-        public static readonly Color SubPanelFill = new(0.03f, 0.047f, 0.075f, 0.98f);
-        public static readonly Color SubPanelBorder = new(0.15f, 0.25f, 0.36f, 0.9f);
+        public static readonly Color PanelFill = new(0.12f, 0.145f, 0.19f, 0.99f);
+        public static readonly Color PanelBorder = new(0.035f, 0.045f, 0.065f, 1f);
+        public static readonly Color PanelShadow = new(0f, 0f, 0f, 0.62f);
+        public static readonly Color SubPanelFill = new(0.065f, 0.078f, 0.105f, 0.98f);
+        public static readonly Color SubPanelBorder = new(0.19f, 0.22f, 0.28f, 1f);
+        public static readonly Color AccentRed = new(0.57f, 0.085f, 0.12f, 1f);
+        public static readonly Color AccentGold = new(0.72f, 0.53f, 0.31f, 1f);
+        public static readonly Color Cream = new(0.93f, 0.89f, 0.77f, 1f);
 
         static Font _titleFont;
         static Font _bodyFont;
@@ -48,18 +51,18 @@ namespace DungeonDash
         // Top-level floating dialog: drop shadow + fill + double border.
         public static void DrawPanel(Rect rect)
         {
-            DrawRect(new Rect(rect.x + 6f, rect.y + 8f, rect.width, rect.height), PanelShadow);
+            DrawRect(new Rect(rect.x + 8f, rect.y + 10f, rect.width, rect.height), PanelShadow);
             DrawRect(rect, PanelFill);
-            DrawBorder(rect, PanelBorder, 2f);
-            DrawBorder(new Rect(rect.x + 3f, rect.y + 3f, rect.width - 6f, rect.height - 6f),
-                new Color(PanelBorder.r, PanelBorder.g, PanelBorder.b, 0.35f), 1f);
+            DrawBorder(rect, PanelBorder, 4f);
+            DrawBorder(new Rect(rect.x + 5f, rect.y + 5f, rect.width - 10f, rect.height - 10f),
+                new Color(0.25f, 0.29f, 0.36f, 0.8f), 2f);
         }
 
         // Nested container inside a dialog: fill + single border, no shadow.
         public static void SubPanel(Rect rect)
         {
             DrawRect(rect, SubPanelFill);
-            DrawBorder(rect, SubPanelBorder, 1f);
+            DrawBorder(rect, SubPanelBorder, 2f);
         }
 
         public static void DrawSprite(Rect rect, Sprite sprite)

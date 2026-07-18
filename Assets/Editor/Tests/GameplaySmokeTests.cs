@@ -105,5 +105,40 @@ namespace DungeonDashTests
 
             yield return new ExitPlayMode();
         }
+
+        [UnityTest]
+        public IEnumerator ClearingAChamber_UnlocksDoorAndLoadsTheNextChunkThroughTransition()
+        {
+            yield return new EnterPlayMode();
+
+            var game = Object.FindFirstObjectByType<DungeonGame>();
+            var catalog = Resources.Load<GameCatalog>("GameCatalog");
+            game.SendMessage("StartRun", catalog.characters[0]);
+            yield return null;
+
+            var firstArena = GameObject.Find("Arena");
+            var player = Object.FindFirstObjectByType<PlayerController>();
+            foreach (var enemy in Object.FindObjectsByType<EnemyActor>(FindObjectsSortMode.None))
+                enemy.TakeDamage(9999);
+            yield return null;
+
+            Assert.That(game.RoomExitUnlocked, Is.True);
+            Assert.That(GameObject.Find("Exit Door Leaf").GetComponent<SpriteRenderer>().sprite.name,
+                Is.EqualTo("doors_leaf_open"));
+            Assert.That(GameObject.Find("Exit Door").GetComponent<InteractionZone>().enabled, Is.True);
+
+            game.SendMessage("BeginNextRoomTransition");
+            Assert.That(game.TransitionActive, Is.True);
+            for (int frame = 0; frame < 180 && game.TransitionActive; frame++) yield return null;
+
+            Assert.That(game.TransitionActive, Is.False, "room transition did not finish");
+            Assert.That(game.CurrentRoom, Is.EqualTo(2));
+            Assert.That(GameObject.Find("Arena"), Is.Not.SameAs(firstArena));
+            Assert.That(Object.FindFirstObjectByType<PlayerController>(), Is.SameAs(player),
+                "room loading should preserve the active player and health");
+            Assert.That(Object.FindObjectsByType<EnemyActor>(FindObjectsSortMode.None), Has.Length.EqualTo(8));
+
+            yield return new ExitPlayMode();
+        }
     }
 }

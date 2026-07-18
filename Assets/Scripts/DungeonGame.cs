@@ -8,7 +8,7 @@ using static DungeonDash.UiTheme;
 
 namespace DungeonDash
 {
-    public enum GameMode { StartScreen, CharacterSelect, HomeHub, InDungeon, Market, Inventory, GameOver }
+    public enum GameMode { StartScreen, CharacterSelect, HomeHub, InDungeon, Market, Inventory, Paused, GameOver }
 
     public sealed class DungeonGame : MonoBehaviour
     {
@@ -35,8 +35,17 @@ namespace DungeonDash
         SaveData.CharacterSlot _activeSlot;
         bool _creatingSlot;
         bool _wavePending;
-        bool _inventoryOwnsPause;
-        float _timeScaleBeforeInventory = 1f;
+        bool _overlayOwnsPause;
+        float _timeScaleBeforeOverlay = 1f;
+        bool _transitioning;
+        float _transitionAmount;
+        string _transitionLabel = string.Empty;
+        Vector2 _roomEntryPoint;
+        InteractionZone _exitDoorZone;
+        SpriteRenderer _exitDoorLeaf;
+        BoxCollider2D _exitDoorBlocker;
+        bool _roomExitUnlocked;
+        bool _audioMuted;
         GameCatalog.CharacterSkin _selectedCharacter;
         Artifact _selectedArtifact;
         Vector2 _inventoryScroll;
@@ -44,6 +53,7 @@ namespace DungeonDash
         string _toast = "Choose a hero";
         float _toastUntil;
         GUIStyle _titleStyle;
+        GUIStyle _hudTitleStyle;
         GUIStyle _toastStyle;
         GUIStyle _labelStyle;
         GUIStyle _smallStyle;
@@ -59,10 +69,13 @@ namespace DungeonDash
         float _uiHeight;
 
         // The player can move in the hub and the dungeon; combat only runs in the dungeon.
-        public bool WorldRunning => _mode == GameMode.HomeHub || _mode == GameMode.InDungeon;
+        public bool WorldRunning => (_mode == GameMode.HomeHub || _mode == GameMode.InDungeon) && !_transitioning;
         public bool AcceptsGameplayInput => WorldRunning;
-        public bool CombatActive => _mode == GameMode.InDungeon;
+        public bool CombatActive => _mode == GameMode.InDungeon && !_transitioning;
         public Artifact EquippedArtifact => _equipped;
+        public bool RoomExitUnlocked => _roomExitUnlocked;
+        public int CurrentRoom => _wave;
+        public bool TransitionActive => _transitioning;
 
         // Per-character save fields, routed through the active slot.
         int Coins { get => _activeSlot.coins; set => _activeSlot.coins = value; }
@@ -119,15 +132,23 @@ namespace DungeonDash
                 OpenMarketOverlay();
                 ClaimLocalMarketProceeds();
             }
+            if (arguments.Contains("--qa-pause") && WorldRunning)
+            {
+                SetPauseOpen(true);
+            }
 
             string argument = arguments
                 .FirstOrDefault(x => x.StartsWith(captureArgument, StringComparison.Ordinal));
             if (argument != null)
+            {
+                Application.runInBackground = true;
                 StartCoroutine(CaptureQaFrame(argument.Substring(captureArgument.Length)));
+            }
         }
 
         static IEnumerator CaptureQaFrame(string path)
         {
+            yield return new WaitForSecondsRealtime(0.25f);
             yield return new WaitForEndOfFrame();
             ScreenCapture.CaptureScreenshot(path);
             Debug.Log($"[DungeonDash] QA screenshot: {path}");
@@ -138,9 +159,20 @@ namespace DungeonDash
             var keyboard = Keyboard.current;
             if (keyboard == null) return;
             if (_mode == GameMode.StartScreen || _mode == GameMode.CharacterSelect || _mode == GameMode.GameOver) return;
+            if (_mode == GameMode.Paused)
+            {
+                if (keyboard.escapeKey.wasPressedThisFrame) SetPauseOpen(false);
+                return;
+            }
+            if (_transitioning) return;
+            if (keyboard.escapeKey.wasPressedThisFrame)
+            {
+                if (_mode == GameMode.Inventory || _mode == GameMode.Market) CloseOverlay();
+                else SetPauseOpen(true);
+                return;
+            }
             if (keyboard.iKey.wasPressedThisFrame) ToggleInventory();
             if (keyboard.mKey.wasPressedThisFrame) ToggleMarket();
-            if (keyboard.escapeKey.wasPressedThisFrame) CloseOverlay();
         }
 
         void ToggleInventory()
@@ -189,23 +221,44 @@ namespace DungeonDash
                 _mode = GameMode.Inventory;
                 GameAudio.Play("ui_click", 0.5f);
                 SelectDefaultArtifact();
-                _timeScaleBeforeInventory = Time.timeScale;
+                _timeScaleBeforeOverlay = Time.timeScale;
                 Time.timeScale = 0f;
-                _inventoryOwnsPause = true;
+                _overlayOwnsPause = true;
             }
             else
             {
                 _mode = _returnMode;
                 GameAudio.Play("ui_click", 0.5f);
-                ReleaseInventoryPause();
+                ReleaseOverlayPause();
             }
         }
 
-        void ReleaseInventoryPause()
+        void SetPauseOpen(bool open)
         {
-            if (!_inventoryOwnsPause) return;
-            Time.timeScale = _timeScaleBeforeInventory;
-            _inventoryOwnsPause = false;
+            if ((_mode == GameMode.Paused) == open) return;
+            if (open)
+            {
+                if (_mode != GameMode.HomeHub && _mode != GameMode.InDungeon) return;
+                _returnMode = _mode;
+                _mode = GameMode.Paused;
+                _timeScaleBeforeOverlay = Time.timeScale;
+                Time.timeScale = 0f;
+                _overlayOwnsPause = true;
+                GameAudio.Play("ui_click", 0.5f);
+            }
+            else
+            {
+                _mode = _returnMode;
+                ReleaseOverlayPause();
+                GameAudio.Play("ui_click", 0.5f);
+            }
+        }
+
+        void ReleaseOverlayPause()
+        {
+            if (!_overlayOwnsPause) return;
+            Time.timeScale = _timeScaleBeforeOverlay;
+            _overlayOwnsPause = false;
         }
 
         void EnsureStartingInventory()
@@ -255,13 +308,6 @@ namespace DungeonDash
             camera.backgroundColor = new Color(0.035f, 0.045f, 0.07f);
         }
 
-        static readonly Vector2Int[] EightNeighborOffsets =
-        {
-            new(-1, -1), new(0, -1), new(1, -1),
-            new(-1, 0), new(1, 0),
-            new(-1, 1), new(0, 1), new(1, 1)
-        };
-
         static readonly Vector2Int[] CardinalOffsets =
         {
             Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right
@@ -270,7 +316,8 @@ namespace DungeonDash
         void BuildArena()
         {
             var root = new GameObject("Arena").transform;
-            var layout = DungeonGenerator.Generate(_random);
+            var layout = DungeonGenerator.GenerateChunk(_random, _wave + 1);
+            _roomEntryPoint = layout.EntryPoint;
             _walkable.Clear();
             _walkable.UnionWith(layout.Walkable);
             foreach (var cell in layout.Walkable)
@@ -292,7 +339,7 @@ namespace DungeonDash
                 else
                 {
                     sprite = DungeonTileSelector.SelectFloor(_catalog.floors, age, _random);
-                    tint = new Color(0.58f, 0.62f, 0.68f); // grey to sink stone into the dark
+                    tint = Color.white;
                 }
                 var floor = CreateSprite($"Floor {cell.x},{cell.y} age {age:0.00}", sprite,
                     new Vector2(cell.x, cell.y), -20, root);
@@ -309,7 +356,7 @@ namespace DungeonDash
                 string spriteName = hasDecoration ? decoration.SpriteName : DungeonTileSelector.WallSpriteName(layout, cell);
                 string prefix = !hasDecoration ? "Wall" : decoration.Kind == WallDecorationKind.Banner ? "Banner" : "Decor";
                 int dist = hasDecoration ? 1 : wallDistances.GetValueOrDefault(cell, int.MaxValue);
-                float brightness = Mathf.Lerp(1f, 0.3f, Mathf.InverseLerp(1f, 5f, dist));
+                float brightness = Mathf.Lerp(1f, 0.46f, Mathf.InverseLerp(1f, 4f, dist));
                 var sprite = DungeonTileSelector.FindByName(_catalog.walls, spriteName);
                 var position = new Vector2(cell.x, cell.y);
                 bool hasCollider = HasWalkableNeighbor(layout, cell);
@@ -337,6 +384,8 @@ namespace DungeonDash
                     loop.Fps = 5f;
                 }
             }
+
+            BuildExitDoor(root, layout);
 
             _enemySpawnPoints.Clear();
             _enemySpawnPoints.AddRange(layout.Walkable
@@ -373,13 +422,13 @@ namespace DungeonDash
         }
 
         static bool HasWalkableNeighbor(DungeonLayout layout, Vector2Int cell) =>
-            EightNeighborOffsets.Any(offset => layout.Walkable.Contains(cell + offset));
+            CardinalOffsets.Any(offset => layout.Walkable.Contains(cell + offset));
 
-        static Color WallTint(float brightness) => new(0.68f * brightness, 0.72f * brightness, 0.78f * brightness);
+        static Color WallTint(float brightness) => new(brightness, brightness, brightness);
 
         GameObject CreateWall(Vector2 position, Sprite sprite, string name, Transform parent, float brightness)
         {
-            var go = CreateSprite(name, sprite, position, -5, parent);
+            var go = CreateSprite(name, sprite, position, YSort.Order(position.y, 0), parent);
             go.GetComponent<SpriteRenderer>().color = WallTint(brightness);
             return go;
         }
@@ -394,9 +443,37 @@ namespace DungeonDash
                 var collider = go.AddComponent<BoxCollider2D>();
                 collider.size = Vector2.one;
             }
-            var child = CreateSprite(name, sprite, position + new Vector2(0f, -1f), -4, go.transform);
+            var child = CreateSprite(name, sprite, position + new Vector2(0f, -1f),
+                YSort.Order(position.y - 2f, 0), go.transform);
             child.GetComponent<SpriteRenderer>().color = WallTint(brightness);
             return go;
+        }
+
+        void BuildExitDoor(Transform parent, DungeonLayout layout)
+        {
+            var center = layout.ExitDoorPosition;
+            var frameLeft = DungeonTileSelector.FindByName(_catalog.walls, "doors_frame_left");
+            var frameTop = DungeonTileSelector.FindByName(_catalog.walls, "doors_frame_top");
+            var frameRight = DungeonTileSelector.FindByName(_catalog.walls, "doors_frame_right");
+            var closed = DungeonTileSelector.FindByName(_catalog.walls, "doors_leaf_closed");
+
+            int order = YSort.Order(center.y - 1f, 0);
+            CreateSprite("Exit Door Frame Left", frameLeft, center + Vector2.left * 1.5f, order, parent);
+            CreateSprite("Exit Door Frame Top", frameTop, center + Vector2.up * 1.5f, order, parent);
+            CreateSprite("Exit Door Frame Right", frameRight, center + Vector2.right * 1.5f, order, parent);
+            var leaf = CreateSprite("Exit Door Leaf", closed, center, order + 1, parent);
+            _exitDoorLeaf = leaf.GetComponent<SpriteRenderer>();
+            _exitDoorBlocker = leaf.AddComponent<BoxCollider2D>();
+            _exitDoorBlocker.offset = new Vector2(0f, -0.55f);
+            _exitDoorBlocker.size = new Vector2(1.8f, 0.7f);
+
+            var interaction = new GameObject("Exit Door");
+            interaction.transform.position = center + Vector2.down;
+            interaction.transform.SetParent(parent);
+            _exitDoorZone = interaction.AddComponent<InteractionZone>();
+            _exitDoorZone.Setup(this, "NEXT CHAMBER", BeginNextRoomTransition);
+            _exitDoorZone.enabled = false;
+            _roomExitUnlocked = false;
         }
 
         static GameObject CreateSprite(string name, Sprite sprite, Vector2 position, int order, Transform parent = null)
@@ -462,25 +539,50 @@ namespace DungeonDash
         {
             ClearActors();
             DestroyWorldRoots();
-            BuildArena();
-            SpawnPlayer(ActiveSkin, Vector2.zero);
             _wave = 0;
             _kills = 0;
+            BuildArena();
+            SpawnPlayer(ActiveSkin, _roomEntryPoint);
             _mode = GameMode.InDungeon;
             Save();
             SpawnWave();
-            Toast("Clear the arena — I: artifacts, M: market");
+            Toast("Clear the chamber and unlock the north door");
+        }
+
+        void BeginDungeonTransition()
+        {
+            if (_transitioning || _mode != GameMode.HomeHub) return;
+            StartCoroutine(EnterDungeonThroughDoor());
+        }
+
+        IEnumerator EnterDungeonThroughDoor()
+        {
+            _transitioning = true;
+            _transitionLabel = "DUNGEON  ·  CHAMBER 01";
+            yield return AnimateTransition(0f, 1f, 0.32f);
+            EnterDungeon();
+            yield return null;
+            Camera.main?.GetComponent<PlayerCenteredCamera>()?.CenterNow();
+            yield return AnimateTransition(1f, 0f, 0.32f);
+            _transitionAmount = 0f;
+            _transitioning = false;
         }
 
         void ClearActors()
         {
-            foreach (var enemy in _enemies.ToArray()) if (enemy != null) Destroy(enemy.gameObject);
-            _enemies.Clear();
+            ClearRoomActors();
             if (_player != null) Destroy(_player.gameObject);
             _player = null;
+        }
+
+        void ClearRoomActors()
+        {
+            foreach (var enemy in _enemies.ToArray()) if (enemy != null) Destroy(enemy.gameObject);
+            _enemies.Clear();
             foreach (var pickup in FindObjectsByType<PickupActor>(FindObjectsSortMode.None)) Destroy(pickup.gameObject);
             foreach (var projectile in FindObjectsByType<ProjectileActor>(FindObjectsSortMode.None)) Destroy(projectile.gameObject);
             foreach (var swing in FindObjectsByType<MeleeSwingActor>(FindObjectsSortMode.None)) Destroy(swing.gameObject);
+            foreach (var corpse in FindObjectsByType<CorpseFade>(FindObjectsSortMode.None)) Destroy(corpse.gameObject);
         }
 
         void DestroyWorldRoots()
@@ -489,6 +591,10 @@ namespace DungeonDash
             if (arena != null) Destroy(arena);
             var hub = GameObject.Find("Hub");
             if (hub != null) Destroy(hub);
+            _exitDoorZone = null;
+            _exitDoorLeaf = null;
+            _exitDoorBlocker = null;
+            _roomExitUnlocked = false;
         }
 
         // A small hand-built room the player returns to between dungeon runs. Two portals sit inside.
@@ -502,7 +608,6 @@ namespace DungeonDash
             const int halfWidth = 8;
             const int halfHeight = 5;
             var floorSprite = _catalog.floors[0];
-            var wallSprite = _catalog.walls[0];
             for (int x = -halfWidth; x <= halfWidth; x++)
             for (int y = -halfHeight; y <= halfHeight; y++)
             {
@@ -510,19 +615,27 @@ namespace DungeonDash
                 var position = new Vector2(x, y);
                 if (border)
                 {
-                    var wall = CreateWall(position, wallSprite, $"Hub Wall {x},{y}", root, 1f);
+                    string wallName;
+                    if (y == halfHeight)
+                        wallName = x == -halfWidth ? "wall_top_left" : x == halfWidth ? "wall_top_right" : "wall_top_mid";
+                    else if (y == -halfHeight)
+                        wallName = x == -halfWidth ? "wall_edge_bottom_left" : x == halfWidth ? "wall_edge_bottom_right" : "edge_down";
+                    else
+                        wallName = x == -halfWidth ? "wall_left" : "wall_right";
+                    var wallSprite = DungeonTileSelector.FindByName(_catalog.walls, wallName);
+                    var wall = CreateWall(position, wallSprite, $"Hub Wall {wallName} {x},{y}", root, 1f);
                     wall.AddComponent<BoxCollider2D>();
                 }
                 else
                 {
                     var floor = CreateSprite($"Hub Floor {x},{y}", floorSprite, position, -20, root);
-                    floor.GetComponent<SpriteRenderer>().color = new Color(0.58f, 0.62f, 0.68f);
+                    floor.GetComponent<SpriteRenderer>().color = Color.white;
                     _walkable.Add(new Vector2Int(x, y));
                 }
             }
 
             CreateHubZone(root, "MARKET", new Vector2(-4f, 2f), OpenMarketFromHub);
-            CreateHubZone(root, "DUNGEON", new Vector2(4f, 2f), EnterDungeon);
+            CreateHubZone(root, "DUNGEON", new Vector2(4f, 2f), BeginDungeonTransition);
 
             SpawnPlayer(ActiveSkin, new Vector2(0f, -1f));
             _wave = 0;
@@ -582,16 +695,68 @@ namespace DungeonDash
                 _wavePending = true;
                 int sold = _localMarket.SimulateSales(_random);
                 DropPickup(Vector2.zero, PickupKind.Chest);
-                if (sold > 0) Toast($"Wave clear — {sold} market listing sold!");
-                StartCoroutine(NextWave());
+                UnlockExitDoor();
+                if (sold > 0) Toast($"Door open — {sold} market listing sold!");
                 Save();
             }
         }
 
-        IEnumerator NextWave()
+        void UnlockExitDoor()
         {
-            yield return new WaitForSeconds(2.5f);
-            if (_mode == GameMode.InDungeon) SpawnWave();
+            _roomExitUnlocked = true;
+            if (_exitDoorLeaf != null)
+                _exitDoorLeaf.sprite = DungeonTileSelector.FindByName(_catalog.walls, "doors_leaf_open");
+            if (_exitDoorBlocker != null) _exitDoorBlocker.enabled = false;
+            if (_exitDoorZone != null) _exitDoorZone.enabled = true;
+            Toast("CHAMBER CLEAR  ·  NORTH DOOR UNLOCKED");
+            GameAudio.Play("chest_open", 0.75f);
+        }
+
+        void BeginNextRoomTransition()
+        {
+            if (!_roomExitUnlocked || _transitioning || _mode != GameMode.InDungeon) return;
+            StartCoroutine(LoadNextRoom());
+        }
+
+        IEnumerator LoadNextRoom()
+        {
+            _transitioning = true;
+            _transitionLabel = $"CHAMBER {_wave + 1:00}";
+            yield return AnimateTransition(0f, 1f, 0.32f);
+
+            ClearRoomActors();
+            var arena = GameObject.Find("Arena");
+            if (arena != null) Destroy(arena);
+            yield return null;
+
+            BuildArena();
+            if (_player != null)
+            {
+                _player.transform.position = _roomEntryPoint;
+                var body = _player.GetComponent<Rigidbody2D>();
+                if (body != null) body.linearVelocity = Vector2.zero;
+            }
+            Camera.main?.GetComponent<PlayerCenteredCamera>()?.CenterNow();
+            SpawnWave();
+            Save();
+
+            yield return AnimateTransition(1f, 0f, 0.32f);
+            _transitionAmount = 0f;
+            _transitioning = false;
+            Toast($"CHAMBER {_wave:00}  ·  FIND THE EXIT");
+        }
+
+        IEnumerator AnimateTransition(float from, float to, float duration)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Mathf.Max(Time.unscaledDeltaTime, 1f / 120f);
+                float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
+                _transitionAmount = Mathf.Lerp(from, to, t);
+                yield return null;
+            }
+            _transitionAmount = to;
         }
 
         void DropArtifact(Vector2 position)
@@ -736,7 +901,7 @@ namespace DungeonDash
         // Ends the current run and returns the player to the home hub.
         void Restart()
         {
-            ReleaseInventoryPause();
+            ReleaseOverlayPause();
             ReturnToHub();
         }
 
@@ -746,7 +911,7 @@ namespace DungeonDash
             _save.Save();
         }
 
-        void OnDisable() => ReleaseInventoryPause();
+        void OnDisable() => ReleaseOverlayPause();
 
         void OnApplicationQuit() => Save();
 
@@ -845,28 +1010,32 @@ namespace DungeonDash
         void InitStyles()
         {
             if (_titleStyle != null) return;
-            _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 24, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 26, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             _titleStyle.font = TitleFont;
-            _titleStyle.normal.textColor = new Color(0.91f, 0.94f, 0.98f);
+            _titleStyle.normal.textColor = Cream;
+            _hudTitleStyle = new GUIStyle(_titleStyle) { fontSize = 18 };
             _toastStyle = new GUIStyle(_titleStyle) { fontSize = 21, fontStyle = FontStyle.Normal };
             _toastStyle.font = BodyFont;
-            _toastStyle.normal.textColor = new Color(0.72f, 0.85f, 0.95f);
+            _toastStyle.normal.textColor = Cream;
             _labelStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, wordWrap = true };
             _labelStyle.font = BodyFont;
-            _labelStyle.normal.textColor = Color.white;
+            _labelStyle.normal.textColor = Cream;
             _smallStyle = new GUIStyle(_labelStyle) { fontSize = 16 };
-            _smallStyle.normal.textColor = new Color(0.76f, 0.81f, 0.9f);
-            _buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 18, fixedHeight = 38 };
-            _buttonStyle.font = BodyFont;
+            _smallStyle.normal.textColor = new Color(0.82f, 0.81f, 0.74f);
+            _buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 12, fixedHeight = 42, alignment = TextAnchor.MiddleCenter };
+            _buttonStyle.font = TitleFont;
             _buttonStyle.normal.background = _catalog.buttonUp.texture;
             _buttonStyle.active.background = _catalog.buttonDown.texture;
+            _buttonStyle.normal.textColor = Cream;
+            _buttonStyle.hover.textColor = Color.white;
+            _buttonStyle.active.textColor = Color.white;
             _dangerButtonStyle = new GUIStyle(_buttonStyle);
             _dangerButtonStyle.normal.background = _catalog.dangerButtonUp.texture;
             _dangerButtonStyle.active.background = _catalog.dangerButtonDown.texture;
             _sectionStyle = new GUIStyle(_labelStyle) { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
-            _sectionStyle.normal.textColor = new Color(0.47f, 0.72f, 0.86f);
+            _sectionStyle.normal.textColor = AccentGold;
             _mutedStyle = new GUIStyle(_smallStyle) { fontSize = 13 };
-            _mutedStyle.normal.textColor = new Color(0.53f, 0.59f, 0.69f);
+            _mutedStyle.normal.textColor = new Color(0.56f, 0.58f, 0.59f);
             _microStyle = new GUIStyle(_mutedStyle) { fontSize = 11, fontStyle = FontStyle.Bold };
             _rightStyle = new GUIStyle(_smallStyle) { alignment = TextAnchor.MiddleRight };
             _centerStyle = new GUIStyle(_smallStyle) { alignment = TextAnchor.MiddleCenter };
@@ -900,43 +1069,62 @@ namespace DungeonDash
                     DrawMarket();
                     GUI.matrix = previousMatrix;
                     return;
+                case GameMode.Paused:
+                    DrawPauseMenu();
+                    GUI.matrix = previousMatrix;
+                    return;
             }
 
             FloatingDamageNumbers.Draw(Camera.main, scale);
 
-            var statusRect = new Rect(18, 18, 440, 112);
+            var portraitRect = new Rect(18, 18, 72, 72);
+            SubPanel(portraitRect);
+            if (_player != null)
+                DrawSprite(new Rect(portraitRect.x + 8, portraitRect.y + 5, 56, 61), ActiveSkin.idle[0]);
+
+            var statusRect = new Rect(82, 18, 372, 72);
             SubPanel(statusRect);
-            DrawRect(new Rect(statusRect.x, statusRect.y, statusRect.width, 3), new Color(0.35f, 0.6f, 0.72f, 0.85f));
-            if (_player != null) DrawHearts(new Rect(28, 28, 30, 30));
+            DrawRect(new Rect(statusRect.x, statusRect.y, 5, statusRect.height), AccentRed);
+            if (_player != null) DrawHearts(new Rect(statusRect.x + 16, statusRect.y + 8, 30, 30));
             if (_catalog.coins.Length > 0)
-                DrawSprite(new Rect(27, 60, 22, 22), _catalog.coins[0]);
-            GUI.Label(new Rect(53, 59, 380, 25), $"{Coins}     WAVE {_wave}     {_kills} KILLS", _sectionStyle);
+                DrawSprite(new Rect(statusRect.x + 16, statusRect.y + 42, 20, 20), _catalog.coins[0]);
+            GUI.Label(new Rect(statusRect.x + 42, statusRect.y + 40, 82, 24), Coins.ToString(), _smallStyle);
             if (_equipped != null)
             {
-                DrawRect(new Rect(28, 91, 3, 22), RarityColor(_equipped.rarity));
-                GUI.Label(new Rect(39, 88, 395, 28), $"{_equipped.rarity.ToUpperInvariant()}  {_equipped.displayName}  ·  Q{_equipped.quality}", _smallStyle);
+                DrawSprite(new Rect(statusRect.x + 126, statusRect.y + 34, 30, 30), WeaponSprite(_equipped.weaponId));
+                GUI.Label(new Rect(statusRect.x + 164, statusRect.y + 38, statusRect.width - 176, 24),
+                    $"{_equipped.displayName}  ·  Q{_equipped.quality}", _smallStyle);
             }
 
-            float menuX = _uiWidth - 354f;
-            if (Button(new Rect(menuX, 20, 160, 40), "VAULT  [I]", _buttonStyle))
+            var chamberRect = new Rect(_uiWidth / 2f - 118f, 18f, 236f, 56f);
+            DrawRect(chamberRect, AccentRed);
+            DrawBorder(chamberRect, new Color(0.25f, 0.03f, 0.045f), 3f);
+            GUI.Label(new Rect(chamberRect.x, chamberRect.y + 3, chamberRect.width, 28),
+                _mode == GameMode.HomeHub ? "HOME BASE" : $"CHAMBER {_wave:00}", _hudTitleStyle);
+            GUI.Label(new Rect(chamberRect.x, chamberRect.y + 31, chamberRect.width, 18),
+                _mode == GameMode.HomeHub ? "SAFE ROOM" : $"{_kills} DEFEATED", _microStyle);
+
+            float menuX = _uiWidth - 316f;
+            if (Button(new Rect(menuX, 20, 142, 46), "VAULT [I]", _buttonStyle))
             {
                 SetInventoryOpen(true);
             }
-            if (Button(new Rect(menuX + 170, 20, 160, 40), "MARKET  [M]", _buttonStyle))
+            if (Button(new Rect(menuX + 152, 20, 142, 46), "MARKET [M]", _buttonStyle))
             {
                 OpenMarketOverlay();
             }
 
             if (Time.time < _toastUntil)
             {
-                var toastRect = new Rect(_uiWidth / 2f - 300, 72, 600, 36);
+                var toastRect = new Rect(_uiWidth / 2f - 280, 82, 560, 36);
                 SubPanel(toastRect);
                 GUI.Label(toastRect, _toast, _toastStyle);
             }
-            GUI.Label(new Rect(0, _uiHeight - 30, _uiWidth, 24),
-                "WASD MOVE   ·   LMB / SPACE ATTACK   ·   RMB DASH   ·   I INVENTORY   ·   M MARKET   ·   ESC CLOSE",
-                _centerStyle);
+            var helpRect = new Rect(_uiWidth / 2f - 355f, _uiHeight - 42f, 710f, 30f);
+            SubPanel(helpRect);
+            GUI.Label(helpRect, "WASD MOVE  ·  LMB ATTACK  ·  RMB DASH  ·  ESC PAUSE", _centerStyle);
             if (_mode == GameMode.GameOver) DrawGameOver();
+            DrawSceneTransition();
             GUI.matrix = previousMatrix;
         }
 
@@ -950,21 +1138,115 @@ namespace DungeonDash
             }
         }
 
-        void DrawStartScreen()
+        void DrawPauseMenu()
         {
             DrawBackdrop();
-            var rect = Centered(560, 400);
+            var rect = Centered(660, 410);
             Panel(rect);
-            DrawRect(new Rect(rect.x, rect.y, rect.width, 6), new Color(0.38f, 0.65f, 0.78f));
-            GUI.Label(new Rect(rect.x, rect.y + 74, rect.width, 48), "DUNGEON DASH", _titleStyle);
-            GUI.Label(new Rect(rect.x, rect.y + 132, rect.width, 26), "A POCKET ROGUELITE", _centerStyle);
-            if (Button(new Rect(rect.x + 130, rect.y + 212, rect.width - 260, 46), "PLAY", _buttonStyle))
+
+            var portrait = new Rect(rect.x + 24, rect.y + 24, 112, 112);
+            SubPanel(portrait);
+            DrawSprite(new Rect(portrait.x + 14, portrait.y + 10, 84, 92), ActiveSkin.idle[0]);
+
+            var banner = new Rect(rect.x + 150, rect.y + 30, rect.width - 176, 82);
+            DrawRect(new Rect(banner.x + 7, banner.y + 8, banner.width, banner.height), new Color(0.07f, 0.025f, 0.03f, 0.8f));
+            DrawRect(banner, new Color(0.56f, 0.09f, 0.13f));
+            DrawBorder(banner, new Color(0.24f, 0.035f, 0.05f), 3f);
+            GUI.Label(banner, "PAUSED", _titleStyle);
+
+            const float slotSize = 78f;
+            const float slotGap = 16f;
+            float slotsX = rect.x + 38f;
+            for (int i = 0; i < 6; i++)
+            {
+                var slot = new Rect(slotsX + i * (slotSize + slotGap), rect.y + 156, slotSize, slotSize);
+                SubPanel(slot);
+                DrawBorder(slot, new Color(0.2f, 0.24f, 0.31f), 2f);
+                if (i < Inventory.Count)
+                    DrawSprite(new Rect(slot.x + 11, slot.y + 11, slot.width - 22, slot.height - 22),
+                        WeaponSprite(Inventory[i].weaponId));
+                else
+                    GUI.Label(slot, "+", _titleStyle);
+            }
+
+            float buttonY = rect.yMax - 112f;
+            float buttonWidth = 176f;
+            if (Button(new Rect(rect.x + 38, buttonY, buttonWidth, 66), "HOME", _dangerButtonStyle))
+            {
+                SetPauseOpen(false);
+                ReturnToHub();
+            }
+            if (Button(new Rect(rect.center.x - buttonWidth / 2f, buttonY, buttonWidth, 66), "RESUME", _buttonStyle))
+                SetPauseOpen(false);
+            if (Button(new Rect(rect.xMax - 38 - buttonWidth, buttonY, buttonWidth, 66),
+                _audioMuted ? "SOUND OFF" : "SOUND ON", _buttonStyle))
+            {
+                _audioMuted = !_audioMuted;
+                AudioListener.volume = _audioMuted ? 0f : 1f;
+            }
+        }
+
+        void DrawSceneTransition()
+        {
+            if (_transitionAmount <= 0f) return;
+            const int bands = 12;
+            float bandHeight = Mathf.Ceil(_uiHeight / bands) + 1f;
+            for (int i = 0; i < bands; i++)
+            {
+                float stagger = i * 0.018f;
+                float amount = Mathf.SmoothStep(0f, 1f,
+                    Mathf.Clamp01((_transitionAmount - stagger) / (1f - (bands - 1) * 0.018f)));
+                float width = _uiWidth * amount;
+                float x = i % 2 == 0 ? 0f : _uiWidth - width;
+                DrawRect(new Rect(x, i * bandHeight, width, bandHeight), new Color(0.012f, 0.015f, 0.022f));
+            }
+
+            if (_transitionAmount < 0.72f) return;
+            var labelRect = new Rect(_uiWidth / 2f - 190f, _uiHeight / 2f - 36f, 380f, 72f);
+            DrawRect(labelRect, new Color(0.08f, 0.025f, 0.035f, 0.96f));
+            DrawBorder(labelRect, new Color(0.55f, 0.12f, 0.16f), 3f);
+            GUI.Label(labelRect, _transitionLabel, _titleStyle);
+        }
+
+        void DrawStartScreen()
+        {
+            DrawTitleBackdrop();
+            var rect = Centered(700, 450);
+            Panel(rect);
+
+            var portrait = new Rect(rect.x + 26, rect.y + 24, 116, 116);
+            SubPanel(portrait);
+            DrawSprite(new Rect(portrait.x + 14, portrait.y + 10, 88, 98), _catalog.characters[0].idle[0]);
+
+            var banner = new Rect(rect.x + 158, rect.y + 30, rect.width - 184, 82);
+            DrawRect(new Rect(banner.x + 8, banner.y + 9, banner.width, banner.height), new Color(0.04f, 0.01f, 0.018f, 0.8f));
+            DrawRect(banner, AccentRed);
+            DrawBorder(banner, new Color(0.25f, 0.03f, 0.045f), 3f);
+            GUI.Label(new Rect(banner.x, banner.y + 2, banner.width, 48), "DUNGEON DASH", _titleStyle);
+            GUI.Label(new Rect(banner.x, banner.y + 47, banner.width, 24), "A POCKET ROGUELITE", _centerStyle);
+
+            const float slotSize = 82f;
+            const float gap = 20f;
+            float slotsX = rect.x + 54f;
+            for (int i = 0; i < 6; i++)
+            {
+                var slot = new Rect(slotsX + i * (slotSize + gap), rect.y + 168, slotSize, slotSize);
+                SubPanel(slot);
+                if (i < _catalog.characters.Length)
+                    DrawSprite(new Rect(slot.x + 10, slot.y + 7, slot.width - 20, slot.height - 14), _catalog.characters[i].idle[0]);
+                else
+                    GUI.Label(slot, "+", _titleStyle);
+            }
+
+            GUI.Label(new Rect(rect.x + 40, rect.y + 268, rect.width - 80, 28),
+                "CHOOSE A DELVER  ·  CLEAR CHAMBERS  ·  HUNT RARE ARTIFACTS", _centerStyle);
+            if (Button(new Rect(rect.x + 110, rect.y + 322, 310, 66), "ENTER DUNGEON", _buttonStyle))
             {
                 _creatingSlot = false;
                 _selectedCharacter = null;
                 _mode = GameMode.CharacterSelect;
             }
-            if (Button(new Rect(rect.x + 130, rect.y + 274, rect.width - 260, 46), "QUIT", _dangerButtonStyle))
+            if (Button(new Rect(rect.x + 438, rect.y + 322, 152, 66), "QUIT", _dangerButtonStyle))
                 Application.Quit();
         }
 
@@ -972,10 +1254,10 @@ namespace DungeonDash
         {
             if (_creatingSlot) { DrawHeroPicker(); return; }
 
-            DrawBackdrop();
+            DrawTitleBackdrop();
             var rect = Centered(1000, 560);
             Panel(rect);
-            DrawRect(new Rect(rect.x, rect.y, rect.width, 5), new Color(0.38f, 0.65f, 0.78f));
+            DrawRect(new Rect(rect.x, rect.y, rect.width, 7), AccentRed);
             GUI.Label(new Rect(rect.x + 34, rect.y + 22, 500, 42), "DELVERS", _titleStyle);
             GUI.Label(new Rect(rect.x + 34, rect.y + 72, rect.width - 68, 24), "CONTINUE A SAVE SLOT OR REGISTER A NEW OPERATIVE", _sectionStyle);
             if (Button(new Rect(rect.xMax - 150, rect.y + 22, 118, 38), "BACK", _buttonStyle))
@@ -1007,7 +1289,7 @@ namespace DungeonDash
         {
             var slot = _save.slots[index];
             var skin = _catalog.characters.FirstOrDefault(x => x.id == slot.characterId) ?? _catalog.characters[0];
-            DrawRect(new Rect(card.x, card.y, card.width, 4), new Color(0.42f, 0.68f, 0.79f));
+            DrawRect(new Rect(card.x, card.y, card.width, 5), AccentGold);
             GUI.Label(new Rect(card.x, card.y + 22, card.width, 28), CharacterName(skin.id).ToUpperInvariant(), _titleStyle);
             GUI.Label(new Rect(card.x, card.y + 56, card.width, 20), CharacterRole(skin.id).ToUpperInvariant(), _microStyle);
             var preview = new Rect(card.x + card.width / 2f - 55, card.y + 90, 110, 118);
@@ -1044,11 +1326,11 @@ namespace DungeonDash
 
         void DrawHeroPicker()
         {
-            DrawBackdrop();
+            DrawTitleBackdrop();
             SelectDefaultCharacter();
             var rect = Centered(1120, 650);
             Panel(rect);
-            DrawRect(new Rect(rect.x, rect.y, rect.width, 5), new Color(0.38f, 0.65f, 0.78f));
+            DrawRect(new Rect(rect.x, rect.y, rect.width, 7), AccentRed);
             GUI.Label(new Rect(rect.x + 34, rect.y + 22, 480, 42), "NEW DELVER", _titleStyle);
             GUI.Label(new Rect(rect.x + 520, rect.y + 29, rect.width - 654, 28), "REGISTRY  /  CHOOSE YOUR OPERATIVE", _rightStyle);
             if (Button(new Rect(rect.xMax - 150, rect.y + 22, 118, 38), "CANCEL", _buttonStyle))
@@ -1070,8 +1352,8 @@ namespace DungeonDash
                 bool hovered = card.Contains(Event.current.mousePosition);
                 bool selected = skin == _selectedCharacter;
                 DrawRect(card, selected ? new Color(0.085f, 0.13f, 0.18f) : hovered ? new Color(0.06f, 0.09f, 0.125f) : new Color(0.038f, 0.055f, 0.078f));
-                DrawRect(new Rect(card.x, card.y, 3f, card.height), selected ? new Color(0.5f, 0.75f, 0.86f) : new Color(0.18f, 0.27f, 0.34f));
-                if (selected) DrawBorder(card, new Color(0.32f, 0.49f, 0.6f), 1f);
+                DrawRect(new Rect(card.x, card.y, 3f, card.height), selected ? AccentGold : new Color(0.18f, 0.19f, 0.2f));
+                if (selected) DrawBorder(card, AccentGold, 1f);
                 var preview = new Rect(card.x + 10f, card.y + 8f, 76f, 86f);
                 DrawSprite(preview, skin.idle[0]);
                 GUI.Label(new Rect(card.x + 92, card.y + 15, card.width - 102, 23), CharacterName(skin.id).ToUpperInvariant(), _smallStyle);
@@ -1141,7 +1423,7 @@ namespace DungeonDash
             SelectDefaultArtifact();
             var rect = Centered(1080, 650);
             Panel(rect);
-            DrawRect(new Rect(rect.x, rect.y, rect.width, 7), new Color(0.22f, 0.66f, 1f));
+            DrawRect(new Rect(rect.x, rect.y, rect.width, 7), AccentRed);
             GUI.Label(new Rect(rect.x + 30, rect.y + 18, 500, 38), "THE VAULT", _titleStyle);
             GUI.Label(new Rect(rect.x + 32, rect.y + 58, 570, 22), "LOADOUT & ARTIFACTS  ·  STRONGEST FINDS FIRST", _sectionStyle);
             if (_catalog.coins.Length > 0)
@@ -1178,7 +1460,7 @@ namespace DungeonDash
                 bool hovered = row.Contains(Event.current.mousePosition);
                 DrawRect(row, selected ? new Color(0.085f, 0.15f, 0.24f) : hovered ? new Color(0.06f, 0.1f, 0.16f) : new Color(0.04f, 0.065f, 0.105f));
                 DrawRect(new Rect(row.x, row.y, 4, row.height), RarityColor(artifact.rarity));
-                if (selected) DrawBorder(row, new Color(0.27f, 0.68f, 1f), 1f);
+                if (selected) DrawBorder(row, AccentGold, 1f);
                 var sprite = WeaponSprite(artifact.weaponId);
                 DrawSprite(new Rect(row.x + 15, row.y + 10, 52, 52), sprite);
                 GUI.Label(new Rect(row.x + 80, row.y + 8, row.width - 178, 27), $"{artifact.rarity.ToUpperInvariant()}  {artifact.displayName}", _labelStyle);
@@ -1249,7 +1531,7 @@ namespace DungeonDash
             DrawBackdrop();
             var rect = Centered(860, 660);
             Panel(rect);
-            DrawRect(new Rect(rect.x, rect.y, rect.width, 6), new Color(0.34f, 0.62f, 0.46f));
+            DrawRect(new Rect(rect.x, rect.y, rect.width, 6), AccentGold);
             GUI.Label(new Rect(rect.x + 30, rect.y + 18, 520, 38), "GLOBAL MARKET", _titleStyle);
             GUI.Label(new Rect(rect.x + 32, rect.y + 58, rect.width - 220, 22), _onlineMarket.Status, _sectionStyle);
             if (Button(new Rect(rect.xMax - 164, rect.y + 20, 132, 38), "CLOSE  [M]", _buttonStyle)) CloseMarket();
@@ -1459,8 +1741,42 @@ namespace DungeonDash
 
         void DrawBackdrop()
         {
-            DrawRect(new Rect(0, 0, _uiWidth, _uiHeight), new Color(0.008f, 0.015f, 0.03f, 0.82f));
-            DrawRect(new Rect(0, 0, _uiWidth, 4), new Color(0.13f, 0.48f, 0.78f, 0.8f));
+            DrawRect(new Rect(0, 0, _uiWidth, _uiHeight), new Color(0.008f, 0.01f, 0.016f, 0.7f));
+            DrawRect(new Rect(0, 0, _uiWidth, 5), AccentRed);
+        }
+
+        void DrawTitleBackdrop()
+        {
+            DrawRect(new Rect(0, 0, _uiWidth, _uiHeight), new Color(0.025f, 0.022f, 0.025f));
+            const float tileSize = 64f;
+            var previous = GUI.color;
+            GUI.color = new Color(0.42f, 0.39f, 0.4f, 1f);
+            for (float y = 0; y < _uiHeight; y += tileSize)
+            for (float x = 0; x < _uiWidth; x += tileSize)
+            {
+                int index = (Mathf.RoundToInt(x / tileSize) + Mathf.RoundToInt(y / tileSize) * 3) % _catalog.floors.Length;
+                DrawSprite(new Rect(x, y, tileSize, tileSize), _catalog.floors[index]);
+            }
+
+            var topWall = DungeonTileSelector.FindByName(_catalog.walls, "wall_top_mid");
+            var bottomWall = DungeonTileSelector.FindByName(_catalog.walls, "edge_down");
+            GUI.color = new Color(0.68f, 0.62f, 0.62f, 1f);
+            for (float x = 0; x < _uiWidth; x += tileSize)
+            {
+                DrawSprite(new Rect(x, 24f, tileSize, tileSize), topWall);
+                DrawSprite(new Rect(x, _uiHeight - 88f, tileSize, tileSize), bottomWall);
+            }
+
+            GUI.color = new Color(0.76f, 0.73f, 0.73f, 1f);
+            int castCount = Mathf.Min(6, _catalog.characters.Length);
+            for (int i = 0; i < castCount; i++)
+            {
+                float x = i < 3 ? 44f + i * 104f : _uiWidth - 132f - (i - 3) * 104f;
+                float y = _uiHeight - 202f - (i % 2) * 24f;
+                DrawSprite(new Rect(x, y, 88f, 108f), _catalog.characters[i].idle[0]);
+            }
+            GUI.color = previous;
+            DrawRect(new Rect(0, 0, _uiWidth, _uiHeight), new Color(0.02f, 0.015f, 0.02f, 0.46f));
         }
 
         Rect Centered(float width, float height) =>

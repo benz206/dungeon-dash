@@ -96,8 +96,8 @@ namespace DungeonDash
             minimapRect.anchorMin = Vector2.zero;
             minimapRect.anchorMax = Vector2.zero;
             minimapRect.pivot = Vector2.zero;
-            minimapRect.anchoredPosition = new Vector2(22f, 22f);
-            minimapRect.sizeDelta = new Vector2(164f, 164f);
+            minimapRect.anchoredPosition = new Vector2(24f, 24f);
+            minimapRect.sizeDelta = new Vector2(136f, 136f);
 
             _circleTexture = CreateCircleTexture(128, false);
             var maskImage = _minimap.GetComponent<Image>();
@@ -124,7 +124,7 @@ namespace DungeonDash
             Stretch(frameObject.GetComponent<RectTransform>());
             var frame = frameObject.GetComponent<Image>();
             frame.sprite = Sprite.Create(_ringTexture, new Rect(0, 0, 128, 128), Vector2.one * 0.5f);
-            frame.color = new Color(0.24f, 0.55f, 0.78f, 0.95f);
+            frame.color = new Color(0.72f, 0.53f, 0.31f, 0.98f);
             frame.raycastTarget = false;
 
             var cameraObject = new GameObject("Minimap Camera");

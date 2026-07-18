@@ -91,6 +91,44 @@ namespace DungeonDashTests
         }
 
         [Test]
+        public void GenerateChunk_AcrossSeedsBuildsBoundedConnectedRoomsWithARealDoorway()
+        {
+            for (int seed = 0; seed < 100; seed++)
+            {
+                var layout = DungeonGenerator.GenerateChunk(new System.Random(seed), seed + 1);
+                Assert.That(layout.Rooms, Has.Count.EqualTo(2), $"Seed {seed} did not create a side wing");
+                Assert.That(layout.Doorway, Has.Count.EqualTo(4), $"Seed {seed} doorway was not 2x2");
+                Assert.That(layout.Doorway.All(layout.Walkable.Contains), Is.True,
+                    $"Seed {seed} doorway was painted over by a wall");
+                Assert.That(layout.Walls.Any(layout.Walkable.Contains), Is.False,
+                    $"Seed {seed} has a wall/floor overlap");
+                Assert.That(layout.Walls.Count, Is.LessThan(900),
+                    $"Seed {seed} filled the whole grid with deep-wall sprites");
+                Assert.That(layout.Walls.All(wall => layout.Walkable.Any(floor =>
+                    Mathf.Max(Mathf.Abs(wall.x - floor.x), Mathf.Abs(wall.y - floor.y)) <= 3)), Is.True,
+                    $"Seed {seed} contains a wall outside the readable boundary band");
+
+                var start = Vector2Int.RoundToInt(layout.EntryPoint);
+                Assert.That(layout.Walkable, Does.Contain(start), $"Seed {seed} entry point is not floor");
+                var reached = new HashSet<Vector2Int> { start };
+                var pending = new Queue<Vector2Int>();
+                pending.Enqueue(start);
+                while (pending.Count > 0)
+                {
+                    var cell = pending.Dequeue();
+                    foreach (var direction in Directions)
+                    {
+                        var next = cell + direction;
+                        if (layout.Walkable.Contains(next) && reached.Add(next)) pending.Enqueue(next);
+                    }
+                }
+
+                Assert.That(reached, Has.Count.EqualTo(layout.Walkable.Count),
+                    $"Seed {seed} contains disconnected chamber floor");
+            }
+        }
+
+        [Test]
         public void WallSelection_UsesOnlyStructuralSprites()
         {
             var layout = DungeonGenerator.Generate(new System.Random(11));
@@ -150,6 +188,12 @@ namespace DungeonDashTests
             Assert.That(walls.All(renderer => DungeonTileSelector.StructuralWallSpriteNames.Contains(renderer.sprite.name)), Is.True);
             Assert.That(banners, Is.Not.Empty);
             Assert.That(banners.All(renderer => renderer.sprite.name.StartsWith("wall_banner_")), Is.True);
+
+            var regularWalls = walls.Where(renderer => renderer.sprite.name != "column_wall").ToArray();
+            var southWall = regularWalls.OrderBy(renderer => renderer.transform.position.y).First();
+            var northWall = regularWalls.OrderByDescending(renderer => renderer.transform.position.y).First();
+            Assert.That(southWall.sortingOrder, Is.GreaterThan(northWall.sortingOrder),
+                "south/front wall faces must sort in front of north/rear wall faces");
 
             yield return new ExitPlayMode();
         }

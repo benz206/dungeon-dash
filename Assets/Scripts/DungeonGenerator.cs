@@ -24,8 +24,11 @@ namespace DungeonDash
         public HashSet<Vector2Int> Walkable { get; } = new();
         public HashSet<Vector2Int> Corridors { get; } = new();
         public HashSet<Vector2Int> Walls { get; } = new();
+        public HashSet<Vector2Int> Doorway { get; } = new();
         public Dictionary<Vector2Int, float> FloorAge { get; } = new();
         public RectInt GridBounds { get; set; }
+        public Vector2 EntryPoint { get; set; }
+        public Vector2 ExitDoorPosition { get; set; }
     }
 
     public static class DungeonGenerator
@@ -38,6 +41,46 @@ namespace DungeonDash
         const int MinRooms = 4;
         const int BaseAttempts = 30;
         const int HardAttemptCap = 120;
+        const int ChunkWallDepth = 3;
+
+        public static DungeonLayout GenerateChunk(System.Random random, int depth)
+        {
+            var layout = new DungeonLayout();
+            int width = random.Next(8, 11) * 2 + 1;
+            int height = random.Next(5, 7) * 2 + 1;
+            var mainRoom = new RectInt(-width / 2, -height / 2, width, height);
+            AddRoom(layout, mainRoom, random);
+
+            // A shallow side wing keeps each chamber readable at one-screen scale while still
+            // producing real inner/outer corners for the wall topology to resolve.
+            int wingWidth = random.Next(4, 6);
+            int wingHeight = random.Next(5, 8);
+            int wingY = random.Next(mainRoom.yMin + 1, mainRoom.yMax - wingHeight);
+            bool wingOnLeft = (depth + random.Next(2)) % 2 == 0;
+            var wing = wingOnLeft
+                ? new RectInt(mainRoom.xMin - wingWidth + 1, wingY, wingWidth, wingHeight)
+                : new RectInt(mainRoom.xMax - 1, wingY, wingWidth, wingHeight);
+            AddRoom(layout, wing, random);
+
+            // The north doorway is two tiles wide and two tiles deep. It is authored as floor so
+            // the surrounding wall classifier sees a genuine opening instead of a sprite overlay.
+            int doorY = mainRoom.yMax;
+            for (int y = doorY; y <= doorY + 1; y++)
+            for (int x = -1; x <= 0; x++)
+            {
+                var cell = new Vector2Int(x, y);
+                layout.Doorway.Add(cell);
+                layout.Corridors.Add(cell);
+                layout.Walkable.Add(cell);
+                layout.FloorAge[cell] = 0.1f;
+            }
+
+            layout.EntryPoint = new Vector2(0f, mainRoom.yMin + 2f);
+            layout.ExitDoorPosition = new Vector2(-0.5f, doorY + 0.5f);
+            layout.GridBounds = BoundsAround(layout.Walkable, ChunkWallDepth + 1);
+            BuildBoundaryWalls(layout, ChunkWallDepth);
+            return layout;
+        }
 
         public static DungeonLayout Generate(System.Random random)
         {
@@ -178,6 +221,26 @@ namespace DungeonDash
 
         static bool IsRoomFloor(DungeonLayout layout, Vector2Int cell) =>
             layout.Rooms.Any(room => room.Bounds.Contains(cell));
+
+        static RectInt BoundsAround(IEnumerable<Vector2Int> cells, int padding)
+        {
+            int xMin = cells.Min(cell => cell.x) - padding;
+            int xMax = cells.Max(cell => cell.x) + padding;
+            int yMin = cells.Min(cell => cell.y) - padding;
+            int yMax = cells.Max(cell => cell.y) + padding;
+            return new RectInt(xMin, yMin, xMax - xMin + 1, yMax - yMin + 1);
+        }
+
+        static void BuildBoundaryWalls(DungeonLayout layout, int depth)
+        {
+            foreach (var floor in layout.Walkable)
+            for (int y = -depth; y <= depth; y++)
+            for (int x = -depth; x <= depth; x++)
+            {
+                var cell = floor + new Vector2Int(x, y);
+                if (!layout.Walkable.Contains(cell)) layout.Walls.Add(cell);
+            }
+        }
 
         static IEnumerable<Vector2Int> Cells(RectInt bounds)
         {
