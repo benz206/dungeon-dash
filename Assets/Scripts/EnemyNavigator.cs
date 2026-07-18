@@ -99,7 +99,7 @@ namespace DungeonDash
         void Update()
         {
             Velocity = Vector2.zero;
-            if (_game == null || !_game.PlayerAlive || !_game.WorldRunning) return;
+            if (_game == null || !_game.PlayerAlive || !_game.CombatActive) return;
 
             if (Time.time < _knockbackUntil)
             {

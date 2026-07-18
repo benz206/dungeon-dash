@@ -8,6 +8,8 @@ using static DungeonDash.UiTheme;
 
 namespace DungeonDash
 {
+    public enum GameMode { StartScreen, CharacterSelect, HomeHub, InDungeon, Market, Inventory, GameOver }
+
     public sealed class DungeonGame : MonoBehaviour
     {
         const float ArenaHalfWidth = 11.5f;
@@ -28,10 +30,10 @@ namespace DungeonDash
         int _enemyCursor;
         int _weaponCursor;
         int _kills;
-        bool _choosingCharacter = true;
-        bool _gameOver;
-        bool _inventoryOpen;
-        bool _marketOpen;
+        GameMode _mode = GameMode.StartScreen;
+        GameMode _returnMode = GameMode.HomeHub;
+        SaveData.CharacterSlot _activeSlot;
+        bool _creatingSlot;
         bool _wavePending;
         bool _inventoryOwnsPause;
         float _timeScaleBeforeInventory = 1f;
@@ -56,9 +58,19 @@ namespace DungeonDash
         float _uiWidth;
         float _uiHeight;
 
-        public bool AcceptsGameplayInput => !_choosingCharacter && !_gameOver && !_inventoryOpen && !_marketOpen;
-        public bool WorldRunning => AcceptsGameplayInput;
+        // The player can move in the hub and the dungeon; combat only runs in the dungeon.
+        public bool WorldRunning => _mode == GameMode.HomeHub || _mode == GameMode.InDungeon;
+        public bool AcceptsGameplayInput => WorldRunning;
+        public bool CombatActive => _mode == GameMode.InDungeon;
         public Artifact EquippedArtifact => _equipped;
+
+        // Per-character save fields, routed through the active slot.
+        int Coins { get => _activeSlot.coins; set => _activeSlot.coins = value; }
+        List<Artifact> Inventory => _activeSlot.inventory;
+        string EquippedId { get => _activeSlot.equippedId; set => _activeSlot.equippedId = value; }
+        string ActiveCharacterId => _activeSlot.characterId;
+        GameCatalog.CharacterSkin ActiveSkin =>
+            _catalog.characters.FirstOrDefault(x => x.id == ActiveCharacterId) ?? _catalog.characters[0];
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Boot()
@@ -80,10 +92,9 @@ namespace DungeonDash
             _save = SaveData.Load();
             _localMarket = new LocalMarketService(_save.marketJson);
             _onlineMarket = new UgsMarketService();
-            EnsureStartingInventory();
             SeedMarket();
             ConfigureCamera();
-            BuildArena();
+            // The world (hub or dungeon) is built once a character slot is chosen — nothing on boot.
         }
 
         void Start()
@@ -99,13 +110,13 @@ namespace DungeonDash
                 var skin = _catalog.characters.FirstOrDefault(x => x.id == id);
                 if (skin != null) StartRun(skin);
             }
-            if (arguments.Contains("--qa-inventory") && !_choosingCharacter)
+            if (arguments.Contains("--qa-inventory") && WorldRunning)
             {
                 SetInventoryOpen(true);
             }
-            if (arguments.Contains("--qa-market") && !_choosingCharacter)
+            if (arguments.Contains("--qa-market") && WorldRunning)
             {
-                _marketOpen = true;
+                OpenMarketOverlay();
                 ClaimLocalMarketProceeds();
             }
 
@@ -125,36 +136,58 @@ namespace DungeonDash
         void Update()
         {
             var keyboard = Keyboard.current;
-            if (keyboard == null || _choosingCharacter || _gameOver) return;
-            if (keyboard.iKey.wasPressedThisFrame)
-            {
-                _marketOpen = false;
-                SetInventoryOpen(!_inventoryOpen);
-            }
-            if (keyboard.mKey.wasPressedThisFrame)
-            {
-                bool open = !_marketOpen;
-                SetInventoryOpen(false);
-                _marketOpen = open;
-                if (_marketOpen) OpenMarket();
-                GameAudio.Play("ui_click", 0.5f);
-            }
-            if (keyboard.escapeKey.wasPressedThisFrame)
-            {
-                SetInventoryOpen(false);
-                if (_marketOpen) GameAudio.Play("ui_click", 0.5f);
-                _marketOpen = false;
-            }
+            if (keyboard == null) return;
+            if (_mode == GameMode.StartScreen || _mode == GameMode.CharacterSelect || _mode == GameMode.GameOver) return;
+            if (keyboard.iKey.wasPressedThisFrame) ToggleInventory();
+            if (keyboard.mKey.wasPressedThisFrame) ToggleMarket();
+            if (keyboard.escapeKey.wasPressedThisFrame) CloseOverlay();
+        }
+
+        void ToggleInventory()
+        {
+            if (_mode == GameMode.Inventory) { SetInventoryOpen(false); return; }
+            if (_mode == GameMode.Market) _mode = _returnMode; // close market back to the underlying world
+            SetInventoryOpen(true);
+        }
+
+        void ToggleMarket()
+        {
+            if (_mode == GameMode.Market) { CloseMarket(); return; }
+            if (_mode == GameMode.Inventory) SetInventoryOpen(false);
+            OpenMarketOverlay();
+        }
+
+        void OpenMarketOverlay()
+        {
+            if (_mode != GameMode.HomeHub && _mode != GameMode.InDungeon) return;
+            _returnMode = _mode;
+            _mode = GameMode.Market;
+            GameAudio.Play("ui_click", 0.5f);
+            OpenMarket();
+        }
+
+        void CloseMarket()
+        {
+            if (_mode != GameMode.Market) return;
+            _mode = _returnMode;
+            GameAudio.Play("ui_click", 0.5f);
+        }
+
+        void CloseOverlay()
+        {
+            if (_mode == GameMode.Inventory) SetInventoryOpen(false);
+            else if (_mode == GameMode.Market) CloseMarket();
         }
 
         void SetInventoryOpen(bool open)
         {
-            if (_inventoryOpen == open) return;
-            _inventoryOpen = open;
-            GameAudio.Play("ui_click", 0.5f);
+            if ((_mode == GameMode.Inventory) == open) return;
             if (open)
             {
-                _marketOpen = false;
+                if (_mode != GameMode.HomeHub && _mode != GameMode.InDungeon) return;
+                _returnMode = _mode;
+                _mode = GameMode.Inventory;
+                GameAudio.Play("ui_click", 0.5f);
                 SelectDefaultArtifact();
                 _timeScaleBeforeInventory = Time.timeScale;
                 Time.timeScale = 0f;
@@ -162,6 +195,8 @@ namespace DungeonDash
             }
             else
             {
+                _mode = _returnMode;
+                GameAudio.Play("ui_click", 0.5f);
                 ReleaseInventoryPause();
             }
         }
@@ -175,20 +210,20 @@ namespace DungeonDash
 
         void EnsureStartingInventory()
         {
-            foreach (var artifact in _save.inventory.Where(x => !WeaponRules.IsArtifactWeapon(x.weaponId)))
+            foreach (var artifact in Inventory.Where(x => !WeaponRules.IsArtifactWeapon(x.weaponId)))
             {
                 artifact.weaponId = "weapon_bow";
                 artifact.displayName = artifact.displayName.Replace("Arrow", "Bow");
             }
-            if (_save.inventory.Count == 0)
+            if (Inventory.Count == 0)
             {
                 var starter = ArtifactGenerator.Roll(_catalog.weapons[0].id, new System.Random(1));
                 starter.displayName = "Starter " + starter.displayName;
-                _save.inventory.Add(starter);
-                _save.equippedId = starter.id;
+                Inventory.Add(starter);
+                EquippedId = starter.id;
             }
-            _equipped = _save.inventory.FirstOrDefault(x => x.id == _save.equippedId) ?? _save.inventory[0];
-            _save.equippedId = _equipped.id;
+            _equipped = Inventory.FirstOrDefault(x => x.id == EquippedId) ?? Inventory[0];
+            EquippedId = _equipped.id;
             Save();
         }
 
@@ -358,11 +393,44 @@ namespace DungeonDash
             return go;
         }
 
+        // QA / test entry point: ensure a slot exists for the hero, then drop straight into a dungeon.
         void StartRun(GameCatalog.CharacterSkin skin)
         {
-            _choosingCharacter = false;
-            _save.characterId = skin.id;
-            var go = CreateSprite("Player", skin.idle[0], Vector2.zero, 10);
+            EnsureSlotForCharacter(skin.id);
+            EnterDungeon();
+        }
+
+        void EnsureSlotForCharacter(string characterId)
+        {
+            int index = _save.slots.FindIndex(s => s.characterId == characterId);
+            if (index < 0)
+            {
+                if (_save.slots.Count < SaveData.MaxSlots)
+                {
+                    _save.CreateSlot(characterId);
+                    index = _save.slots.Count - 1;
+                }
+                else
+                {
+                    index = Mathf.Clamp(_save.activeSlot, 0, _save.slots.Count - 1);
+                    _save.slots[index].characterId = characterId;
+                }
+            }
+            ActivateSlot(index);
+        }
+
+        void ActivateSlot(int index)
+        {
+            _save.activeSlot = index;
+            _activeSlot = _save.slots[index];
+            EnsureStartingInventory();
+            Save();
+        }
+
+        void SpawnPlayer(GameCatalog.CharacterSkin skin, Vector2 position)
+        {
+            if (_player != null) Destroy(_player.gameObject);
+            var go = CreateSprite("Player", skin.idle[0], position, 10);
             var body = go.AddComponent<Rigidbody2D>();
             body.gravityScale = 0f;
             body.freezeRotation = true;
@@ -371,12 +439,96 @@ namespace DungeonDash
             collider.offset = new Vector2(0f, -0.25f);
             _player = go.AddComponent<PlayerController>();
             _player.Setup(this, skin);
+        }
+
+        void EnterDungeon()
+        {
+            ClearActors();
+            DestroyWorldRoots();
+            BuildArena();
+            SpawnPlayer(ActiveSkin, Vector2.zero);
             _wave = 0;
             _kills = 0;
+            _mode = GameMode.InDungeon;
             Save();
             SpawnWave();
             Toast("Clear the arena — I: artifacts, M: market");
         }
+
+        void ClearActors()
+        {
+            foreach (var enemy in _enemies.ToArray()) if (enemy != null) Destroy(enemy.gameObject);
+            _enemies.Clear();
+            if (_player != null) Destroy(_player.gameObject);
+            _player = null;
+            foreach (var pickup in FindObjectsByType<PickupActor>(FindObjectsSortMode.None)) Destroy(pickup.gameObject);
+            foreach (var projectile in FindObjectsByType<ProjectileActor>(FindObjectsSortMode.None)) Destroy(projectile.gameObject);
+            foreach (var swing in FindObjectsByType<MeleeSwingActor>(FindObjectsSortMode.None)) Destroy(swing.gameObject);
+        }
+
+        void DestroyWorldRoots()
+        {
+            var arena = GameObject.Find("Arena");
+            if (arena != null) Destroy(arena);
+            var hub = GameObject.Find("Hub");
+            if (hub != null) Destroy(hub);
+        }
+
+        // A small hand-built room the player returns to between dungeon runs. Two portals sit inside.
+        void BuildHub()
+        {
+            ClearActors();
+            DestroyWorldRoots();
+
+            var root = new GameObject("Hub").transform;
+            _walkable.Clear();
+            const int halfWidth = 8;
+            const int halfHeight = 5;
+            var floorSprite = _catalog.floors[0];
+            var wallSprite = _catalog.walls[0];
+            for (int x = -halfWidth; x <= halfWidth; x++)
+            for (int y = -halfHeight; y <= halfHeight; y++)
+            {
+                bool border = x == -halfWidth || x == halfWidth || y == -halfHeight || y == halfHeight;
+                var position = new Vector2(x, y);
+                if (border)
+                {
+                    var wall = CreateWall(position, wallSprite, $"Hub Wall {x},{y}", root, 1f);
+                    wall.AddComponent<BoxCollider2D>();
+                }
+                else
+                {
+                    var floor = CreateSprite($"Hub Floor {x},{y}", floorSprite, position, -20, root);
+                    floor.GetComponent<SpriteRenderer>().color = new Color(0.58f, 0.62f, 0.68f);
+                    _walkable.Add(new Vector2Int(x, y));
+                }
+            }
+
+            CreateHubZone(root, "MARKET", new Vector2(-4f, 2f), OpenMarketFromHub);
+            CreateHubZone(root, "DUNGEON", new Vector2(4f, 2f), EnterDungeon);
+
+            SpawnPlayer(ActiveSkin, new Vector2(0f, -1f));
+            _wave = 0;
+            _kills = 0;
+            _mode = GameMode.HomeHub;
+            Toast("Home — stand on a portal and press E");
+        }
+
+        void CreateHubZone(Transform parent, string label, Vector2 position, System.Action onInteract)
+        {
+            var marker = CreateSprite($"Zone {label}", _catalog.chests.Length > 0 ? _catalog.chests[0] : null, position, 6, parent);
+            marker.transform.localScale = Vector3.one * 1.1f;
+            marker.AddComponent<InteractionZone>().Setup(this, label, onInteract);
+        }
+
+        void OpenMarketFromHub()
+        {
+            _returnMode = GameMode.HomeHub;
+            _mode = GameMode.Market;
+            OpenMarket();
+        }
+
+        void ReturnToHub() => BuildHub();
 
         void SpawnWave()
         {
@@ -422,7 +574,7 @@ namespace DungeonDash
         IEnumerator NextWave()
         {
             yield return new WaitForSeconds(2.5f);
-            if (!_gameOver) SpawnWave();
+            if (_mode == GameMode.InDungeon) SpawnWave();
         }
 
         void DropArtifact(Vector2 position)
@@ -486,7 +638,7 @@ namespace DungeonDash
                     Toast($"Bomb blast hit {hit} enemies");
                     break;
                 case PickupKind.Artifact:
-                    _save.inventory.Add(artifact);
+                    Inventory.Add(artifact);
                     GameAudio.Play("artifact_drop", 0.6f);
                     Toast($"Found {artifact.rarity} {artifact.displayName} ({artifact.quality})");
                     break;
@@ -559,23 +711,16 @@ namespace DungeonDash
 
         public void GameOver()
         {
-            _gameOver = true;
+            _mode = GameMode.GameOver;
             GameAudio.Play("game_over", 0.8f);
             Save();
         }
 
+        // Ends the current run and returns the player to the home hub.
         void Restart()
         {
-            foreach (var enemy in _enemies.ToArray()) if (enemy != null) Destroy(enemy.gameObject);
-            _enemies.Clear();
-            if (_player != null) Destroy(_player.gameObject);
-            foreach (var pickup in FindObjectsByType<PickupActor>(FindObjectsSortMode.None)) Destroy(pickup.gameObject);
-            foreach (var projectile in FindObjectsByType<ProjectileActor>(FindObjectsSortMode.None)) Destroy(projectile.gameObject);
-            foreach (var swing in FindObjectsByType<MeleeSwingActor>(FindObjectsSortMode.None)) Destroy(swing.gameObject);
-            _gameOver = false;
-            _choosingCharacter = true;
-            SetInventoryOpen(false);
-            _marketOpen = false;
+            ReleaseInventoryPause();
+            ReturnToHub();
         }
 
         void Save()
@@ -596,7 +741,7 @@ namespace DungeonDash
 
         void AddCoins(int amount)
         {
-            _save.coins += amount;
+            Coins += amount;
             if (_save.marketAccountInitialized) _save.marketPendingCoinDelta += amount;
         }
 
@@ -644,7 +789,7 @@ namespace DungeonDash
                 }
                 else
                 {
-                    int initialBalance = Mathf.Max(0, _save.coins - _save.marketPendingCoinDelta);
+                    int initialBalance = Mathf.Max(0, Coins - _save.marketPendingCoinDelta);
                     connected = await _onlineMarket.ConnectAsync(initialBalance, _save.marketPendingCoinDelta);
                 }
 
@@ -664,21 +809,20 @@ namespace DungeonDash
 
         void SyncOnlineBalance()
         {
-            _save.coins = _onlineMarket.Balance;
+            Coins = _onlineMarket.Balance;
             Save();
         }
 
         void SelectDefaultArtifact()
         {
-            if (_selectedArtifact != null && _save.inventory.Contains(_selectedArtifact)) return;
-            _selectedArtifact = _equipped ?? _save.inventory.OrderByDescending(x => x.quality).FirstOrDefault();
+            if (_selectedArtifact != null && Inventory.Contains(_selectedArtifact)) return;
+            _selectedArtifact = _equipped ?? Inventory.OrderByDescending(x => x.quality).FirstOrDefault();
         }
 
         void SelectDefaultCharacter()
         {
             if (_selectedCharacter != null && _catalog.characters.Contains(_selectedCharacter)) return;
-            _selectedCharacter = _catalog.characters.FirstOrDefault(x => x.id == _save.characterId)
-                ?? _catalog.characters[0];
+            _selectedCharacter = _catalog.characters[0];
         }
 
         void InitStyles()
@@ -721,23 +865,24 @@ namespace DungeonDash
             _uiWidth = Screen.width / scale;
             _uiHeight = Screen.height / scale;
 
-            if (_choosingCharacter)
+            switch (_mode)
             {
-                DrawCharacterPicker();
-                GUI.matrix = previousMatrix;
-                return;
-            }
-            if (_inventoryOpen)
-            {
-                DrawInventory();
-                GUI.matrix = previousMatrix;
-                return;
-            }
-            if (_marketOpen)
-            {
-                DrawMarket();
-                GUI.matrix = previousMatrix;
-                return;
+                case GameMode.StartScreen:
+                    DrawStartScreen();
+                    GUI.matrix = previousMatrix;
+                    return;
+                case GameMode.CharacterSelect:
+                    DrawCharacterSelect();
+                    GUI.matrix = previousMatrix;
+                    return;
+                case GameMode.Inventory:
+                    DrawInventory();
+                    GUI.matrix = previousMatrix;
+                    return;
+                case GameMode.Market:
+                    DrawMarket();
+                    GUI.matrix = previousMatrix;
+                    return;
             }
 
             FloatingDamageNumbers.Draw(Camera.main, scale);
@@ -748,7 +893,7 @@ namespace DungeonDash
             if (_player != null) DrawHearts(new Rect(28, 28, 30, 30));
             if (_catalog.coins.Length > 0)
                 DrawSprite(new Rect(27, 60, 22, 22), _catalog.coins[0]);
-            GUI.Label(new Rect(53, 59, 380, 25), $"{_save.coins}     WAVE {_wave}     {_kills} KILLS", _sectionStyle);
+            GUI.Label(new Rect(53, 59, 380, 25), $"{Coins}     WAVE {_wave}     {_kills} KILLS", _sectionStyle);
             if (_equipped != null)
             {
                 DrawRect(new Rect(28, 91, 3, 22), RarityColor(_equipped.rarity));
@@ -762,8 +907,7 @@ namespace DungeonDash
             }
             if (Button(new Rect(menuX + 170, 20, 160, 40), "MARKET  [M]", _buttonStyle))
             {
-                _marketOpen = true;
-                OpenMarket();
+                OpenMarketOverlay();
             }
 
             if (Time.time < _toastUntil)
@@ -775,7 +919,7 @@ namespace DungeonDash
             GUI.Label(new Rect(0, _uiHeight - 30, _uiWidth, 24),
                 "WASD MOVE   ·   LMB / SPACE ATTACK   ·   RMB DASH   ·   I INVENTORY   ·   M MARKET   ·   ESC CLOSE",
                 _centerStyle);
-            if (_gameOver) DrawGameOver();
+            if (_mode == GameMode.GameOver) DrawGameOver();
             GUI.matrix = previousMatrix;
         }
 
@@ -789,24 +933,109 @@ namespace DungeonDash
             }
         }
 
-        void DrawCharacterPicker()
+        void DrawStartScreen()
+        {
+            DrawBackdrop();
+            var rect = Centered(560, 400);
+            Panel(rect);
+            DrawRect(new Rect(rect.x, rect.y, rect.width, 6), new Color(0.38f, 0.65f, 0.78f));
+            GUI.Label(new Rect(rect.x, rect.y + 74, rect.width, 48), "DUNGEON DASH", _titleStyle);
+            GUI.Label(new Rect(rect.x, rect.y + 132, rect.width, 26), "A POCKET ROGUELITE", _centerStyle);
+            if (Button(new Rect(rect.x + 130, rect.y + 212, rect.width - 260, 46), "PLAY", _buttonStyle))
+            {
+                _creatingSlot = false;
+                _selectedCharacter = null;
+                _mode = GameMode.CharacterSelect;
+            }
+            if (Button(new Rect(rect.x + 130, rect.y + 274, rect.width - 260, 46), "QUIT", _dangerButtonStyle))
+                Application.Quit();
+        }
+
+        void DrawCharacterSelect()
+        {
+            if (_creatingSlot) { DrawHeroPicker(); return; }
+
+            DrawBackdrop();
+            var rect = Centered(1000, 560);
+            Panel(rect);
+            DrawRect(new Rect(rect.x, rect.y, rect.width, 5), new Color(0.38f, 0.65f, 0.78f));
+            GUI.Label(new Rect(rect.x + 34, rect.y + 22, 500, 42), "DELVERS", _titleStyle);
+            GUI.Label(new Rect(rect.x + 34, rect.y + 72, rect.width - 68, 24), "CONTINUE A SAVE SLOT OR REGISTER A NEW OPERATIVE", _sectionStyle);
+            if (Button(new Rect(rect.xMax - 150, rect.y + 22, 118, 38), "BACK", _buttonStyle))
+                _mode = GameMode.StartScreen;
+
+            const float slotGap = 24f;
+            float slotWidth = (rect.width - 68f - slotGap * 2f) / 3f;
+            for (int i = 0; i < SaveData.MaxSlots; i++)
+            {
+                var card = new Rect(rect.x + 34 + i * (slotWidth + slotGap), rect.y + 118, slotWidth, 400);
+                SubPanel(card);
+                if (i < _save.slots.Count) DrawFilledSlot(card, i);
+                else DrawEmptySlot(card);
+            }
+        }
+
+        void DrawEmptySlot(Rect card)
+        {
+            GUI.Label(new Rect(card.x, card.center.y - 46, card.width, 28), "EMPTY", _centerStyle);
+            if (Button(new Rect(card.x + 24, card.center.y, card.width - 48, 46), "+ NEW CHARACTER", _buttonStyle))
+            {
+                _creatingSlot = true;
+                _selectedCharacter = null;
+                SelectDefaultCharacter();
+            }
+        }
+
+        void DrawFilledSlot(Rect card, int index)
+        {
+            var slot = _save.slots[index];
+            var skin = _catalog.characters.FirstOrDefault(x => x.id == slot.characterId) ?? _catalog.characters[0];
+            DrawRect(new Rect(card.x, card.y, card.width, 4), new Color(0.42f, 0.68f, 0.79f));
+            GUI.Label(new Rect(card.x, card.y + 22, card.width, 28), CharacterName(skin.id).ToUpperInvariant(), _titleStyle);
+            GUI.Label(new Rect(card.x, card.y + 56, card.width, 20), CharacterRole(skin.id).ToUpperInvariant(), _microStyle);
+            var preview = new Rect(card.x + card.width / 2f - 55, card.y + 90, 110, 118);
+            DrawRect(preview, new Color(0.018f, 0.027f, 0.04f));
+            DrawBorder(preview, new Color(0.22f, 0.34f, 0.43f), 1f);
+            DrawSprite(new Rect(preview.x + 12, preview.y + 10, 86, 98), skin.idle[0]);
+            GUI.Label(new Rect(card.x, card.y + 222, card.width, 24), $"{slot.coins} COINS  ·  {slot.inventory.Count} ARTIFACTS", _centerStyle);
+            if (Button(new Rect(card.x + 24, card.yMax - 110, card.width - 48, 44), "CONTINUE", _buttonStyle))
+                ContinueSlot(index);
+            if (Button(new Rect(card.x + 24, card.yMax - 56, card.width - 48, 40), "DELETE", _dangerButtonStyle))
+                DeleteSlotAt(index);
+        }
+
+        void ContinueSlot(int index)
+        {
+            _creatingSlot = false;
+            ActivateSlot(index);
+            BuildHub();
+        }
+
+        void DeleteSlotAt(int index)
+        {
+            _save.DeleteSlot(index);
+            _save.Save();
+        }
+
+        void ConfirmNewSlot(GameCatalog.CharacterSkin skin)
+        {
+            _save.CreateSlot(skin.id);
+            _creatingSlot = false;
+            ActivateSlot(_save.slots.Count - 1);
+            BuildHub();
+        }
+
+        void DrawHeroPicker()
         {
             DrawBackdrop();
             SelectDefaultCharacter();
             var rect = Centered(1120, 650);
             Panel(rect);
             DrawRect(new Rect(rect.x, rect.y, rect.width, 5), new Color(0.38f, 0.65f, 0.78f));
-            GUI.Label(new Rect(rect.x + 34, rect.y + 22, 430, 42), "DUNGEON DASH", _titleStyle);
-            GUI.Label(new Rect(rect.x + 480, rect.y + 29, rect.width - 514, 28), "DELVER REGISTRY  /  CHOOSE YOUR OPERATIVE", _rightStyle);
-
-            var metaRect = new Rect(rect.x + 34, rect.y + 76, rect.width - 68, 44);
-            SubPanel(metaRect);
-            if (_catalog.coins.Length > 0)
-                DrawSprite(new Rect(metaRect.x + 14, metaRect.y + 10, 24, 24), _catalog.coins[0]);
-            GUI.Label(new Rect(metaRect.x + 44, metaRect.y, 220, metaRect.height), $"{_save.coins} BANKED", _sectionStyle);
-            GUI.Label(new Rect(metaRect.x + 274, metaRect.y, 240, metaRect.height), $"{_save.inventory.Count} ARTIFACTS", _sectionStyle);
-            GUI.Label(new Rect(metaRect.x + 530, metaRect.y, 500, metaRect.height),
-                _equipped == null ? "NO ARTIFACT EQUIPPED" : $"DEPLOYING WITH  {_equipped.displayName.ToUpperInvariant()}  ·  Q{_equipped.quality}", _rightStyle);
+            GUI.Label(new Rect(rect.x + 34, rect.y + 22, 480, 42), "NEW DELVER", _titleStyle);
+            GUI.Label(new Rect(rect.x + 520, rect.y + 29, rect.width - 654, 28), "REGISTRY  /  CHOOSE YOUR OPERATIVE", _rightStyle);
+            if (Button(new Rect(rect.xMax - 150, rect.y + 22, 118, 38), "CANCEL", _buttonStyle))
+                _creatingSlot = false;
 
             var rosterRect = new Rect(rect.x + 34, rect.y + 138, 706, 468);
             var detailRect = new Rect(rect.x + 758, rect.y + 138, 328, 468);
@@ -844,22 +1073,27 @@ namespace DungeonDash
             GUI.Label(new Rect(rect.x + 24, rect.y + 18, rect.width - 48, 22),
                 $"{CharacterRole(skin.id).ToUpperInvariant()}  /  APPEARANCE {CharacterVariant(skin.id)}", _sectionStyle);
 
-            var preview = new Rect(rect.x + 74, rect.y + 51, 180, 184);
+            var preview = new Rect(rect.x + 74, rect.y + 46, 180, 150);
             DrawRect(preview, new Color(0.018f, 0.027f, 0.04f));
             DrawBorder(preview, new Color(0.22f, 0.34f, 0.43f), 1f);
-            DrawSprite(new Rect(preview.x + 15, preview.y + 11, 150, 162), skin.idle[0]);
+            DrawSprite(new Rect(preview.x + 15, preview.y + 11, 150, 128), skin.idle[0]);
 
-            GUI.Label(new Rect(rect.x + 22, rect.y + 248, rect.width - 44, 34), CharacterName(skin.id).ToUpperInvariant(), _titleStyle);
-            GUI.Label(new Rect(rect.x + 26, rect.y + 291, rect.width - 52, 44), CharacterDescription(skin.id), _centerStyle);
-            GUI.Label(new Rect(rect.x + 26, rect.y + 346, 160, 20), "MOVEMENT", _microStyle);
-            GUI.Label(new Rect(rect.x + 190, rect.y + 344, 110, 22), skin.speed.ToString("0.0"), _rightStyle);
-            var bar = new Rect(rect.x + 26, rect.y + 372, rect.width - 52, 7);
-            DrawRect(bar, new Color(0.012f, 0.02f, 0.03f));
-            DrawRect(new Rect(bar.x, bar.y, bar.width * Mathf.InverseLerp(4f, 6f, skin.speed), bar.height), new Color(0.42f, 0.68f, 0.79f));
+            GUI.Label(new Rect(rect.x + 22, rect.y + 204, rect.width - 44, 30), CharacterName(skin.id).ToUpperInvariant(), _titleStyle);
 
-            if (Button(new Rect(rect.x + 26, rect.yMax - 60, rect.width - 52, 40), "ENTER THE DUNGEON", _buttonStyle))
-                StartRun(skin);
+            float statsY = rect.y + 252f;
+            DrawStat(new Rect(rect.x + 24, statsY, rect.width - 48, 40), "HEALTH",
+                SkinMaxHealth(skin).ToString("0"), SkinMaxHealth(skin) / 16f, new Color(0.82f, 0.35f, 0.4f));
+            DrawStat(new Rect(rect.x + 24, statsY + 52, rect.width - 48, 40), "MOVEMENT",
+                skin.speed.ToString("0.0"), Mathf.InverseLerp(4f, 6f, skin.speed), new Color(0.42f, 0.68f, 0.79f));
+            DrawStat(new Rect(rect.x + 24, statsY + 104, rect.width - 48, 40), "DAMAGE",
+                $"x{SkinDamageMod(skin):0.0}", Mathf.InverseLerp(0.8f, 1.6f, SkinDamageMod(skin)), new Color(0.85f, 0.66f, 0.32f));
+
+            if (Button(new Rect(rect.x + 26, rect.yMax - 58, rect.width - 52, 42), "CONFIRM DELVER", _buttonStyle))
+                ConfirmNewSlot(skin);
         }
+
+        static float SkinMaxHealth(GameCatalog.CharacterSkin skin) => skin.maxHealth > 0f ? skin.maxHealth : 10f;
+        static float SkinDamageMod(GameCatalog.CharacterSkin skin) => skin.damageMod > 0f ? skin.damageMod : 1f;
 
         static string CharacterName(string id) => CharacterBase(id) switch
         {
@@ -876,16 +1110,6 @@ namespace DungeonDash
             "lizard" => "Skirmisher",
             "wizzard" => "Arcanist",
             _ => "Apothecary"
-        };
-
-        static string CharacterDescription(string id) => CharacterBase(id) switch
-        {
-            "knight" => "A disciplined front-line delver with measured movement.",
-            "elf" => "A swift expedition specialist built for precise repositioning.",
-            "dwarf" => "A deliberate, grounded delver who rewards committed movement.",
-            "lizard" => "The fastest operative in the registry, tuned for evasive play.",
-            "wizzard" => "A methodical arcane delver with balanced mobility.",
-            _ => "A versatile field specialist with above-average mobility."
         };
 
         static string CharacterBase(string id) => id.EndsWith("_m", StringComparison.Ordinal)
@@ -905,14 +1129,14 @@ namespace DungeonDash
             GUI.Label(new Rect(rect.x + 32, rect.y + 58, 570, 22), "LOADOUT & ARTIFACTS  ·  STRONGEST FINDS FIRST", _sectionStyle);
             if (_catalog.coins.Length > 0)
                 DrawSprite(new Rect(rect.x + 656, rect.y + 29, 22, 22), _catalog.coins[0]);
-            GUI.Label(new Rect(rect.x + 684, rect.y + 25, 196, 32), $"{_save.coins}  ·  {_save.inventory.Count} ARTIFACTS", _rightStyle);
+            GUI.Label(new Rect(rect.x + 684, rect.y + 25, 196, 32), $"{Coins}  ·  {Inventory.Count} ARTIFACTS", _rightStyle);
             if (Button(new Rect(rect.xMax - 164, rect.y + 20, 132, 38), "RESUME  [I]", _buttonStyle)) SetInventoryOpen(false);
 
             var listRect = new Rect(rect.x + 30, rect.y + 96, 590, 500);
             var detailRect = new Rect(rect.x + 640, rect.y + 96, 410, 500);
             SubPanel(listRect);
             DrawRect(new Rect(listRect.x, listRect.y, listRect.width, 64), new Color(0.045f, 0.07f, 0.105f));
-            var hero = _catalog.characters.FirstOrDefault(x => x.id == _save.characterId);
+            var hero = _catalog.characters.FirstOrDefault(x => x.id == ActiveCharacterId);
             if (hero != null)
             {
                 DrawSprite(new Rect(listRect.x + 10, listRect.y + 4, 54, 56), hero.idle[0]);
@@ -921,7 +1145,7 @@ namespace DungeonDash
             }
             GUI.Label(new Rect(listRect.x + 330, listRect.y + 11, 240, 42), "SELECT ARTIFACT TO INSPECT", _rightStyle);
 
-            var artifacts = _save.inventory
+            var artifacts = Inventory
                 .OrderByDescending(x => x.id == _equipped.id)
                 .ThenByDescending(x => x.quality)
                 .ToArray();
@@ -1011,13 +1235,13 @@ namespace DungeonDash
             DrawRect(new Rect(rect.x, rect.y, rect.width, 6), new Color(0.34f, 0.62f, 0.46f));
             GUI.Label(new Rect(rect.x + 30, rect.y + 18, 520, 38), "GLOBAL MARKET", _titleStyle);
             GUI.Label(new Rect(rect.x + 32, rect.y + 58, rect.width - 220, 22), _onlineMarket.Status, _sectionStyle);
-            if (Button(new Rect(rect.xMax - 164, rect.y + 20, 132, 38), "CLOSE  [M]", _buttonStyle)) _marketOpen = false;
+            if (Button(new Rect(rect.xMax - 164, rect.y + 20, 132, 38), "CLOSE  [M]", _buttonStyle)) CloseMarket();
 
             string pending = _useOnlineMarket && _onlineMarket.PendingCoins > 0
                 ? $"  ·  {_onlineMarket.PendingCoins} PROCEEDS READY" : string.Empty;
             if (_catalog.coins.Length > 0)
                 DrawSprite(new Rect(rect.x + 30, rect.y + 84, 22, 22), _catalog.coins[0]);
-            GUI.Label(new Rect(rect.x + 58, rect.y + 82, rect.width - 90, 26), $"{_save.coins} COINS{pending}", _smallStyle);
+            GUI.Label(new Rect(rect.x + 58, rect.y + 82, rect.width - 90, 26), $"{Coins} COINS{pending}", _smallStyle);
 
             float actionY = rect.y + 118;
             GUI.enabled = !_onlineMarket.Busy;
@@ -1052,7 +1276,7 @@ namespace DungeonDash
 
                 bool own = IsOwnListing(listing);
                 var buttonRect = new Rect(row.xMax - 92, row.y + 16, 82, 32);
-                GUI.enabled = own ? !_onlineMarket.Busy : !_onlineMarket.Busy && _save.coins >= listing.price;
+                GUI.enabled = own ? !_onlineMarket.Busy : !_onlineMarket.Busy && Coins >= listing.price;
                 if (Button(buttonRect, own ? "CANCEL" : "BUY", own ? _dangerButtonStyle : _buttonStyle))
                 {
                     if (own) CancelListing(listing); else BuyListing(listing);
@@ -1071,14 +1295,14 @@ namespace DungeonDash
             GUILayout.Label("RUN ENDED", _titleStyle);
             GUILayout.Label($"Reached wave {_wave} with {_kills} kills.\nArtifacts and coins are saved.", _labelStyle);
             GUILayout.FlexibleSpace();
-            if (LayoutButton("Choose Hero & Run Again", _dangerButtonStyle)) Restart();
+            if (LayoutButton("Return to Home Hub", _dangerButtonStyle)) Restart();
             GUILayout.EndArea();
         }
 
         void Equip(Artifact artifact)
         {
             _equipped = artifact;
-            _save.equippedId = artifact.id;
+            EquippedId = artifact.id;
             _player.RefreshWeapon();
             Toast($"Equipped {artifact.displayName}");
             Save();
@@ -1112,7 +1336,7 @@ namespace DungeonDash
             if (!online)
             {
                 if (_onlineMarket.IsOnline) return;
-                _save.inventory.Remove(artifact);
+                Inventory.Remove(artifact);
                 _localMarket.List(artifact, artifact.Price);
                 Toast($"Online unavailable — listed {artifact.displayName} locally");
                 Save();
@@ -1122,7 +1346,7 @@ namespace DungeonDash
             try
             {
                 await _onlineMarket.ListAsync(artifact, artifact.Price);
-                _save.inventory.Remove(artifact);
+                Inventory.Remove(artifact);
                 SyncOnlineBalance();
                 Toast($"Listed {artifact.displayName} globally for {artifact.Price} coins");
             }
@@ -1136,12 +1360,13 @@ namespace DungeonDash
         {
             if (!_useOnlineMarket)
             {
-                int oldBalance = _save.coins;
-                var localArtifact = _localMarket.Buy(listing.id, ref _save.coins);
+                int coins = Coins;
+                var localArtifact = _localMarket.Buy(listing.id, ref coins);
                 if (localArtifact == null) return;
                 if (_save.marketAccountInitialized)
-                    _save.marketPendingCoinDelta += _save.coins - oldBalance;
-                _save.inventory.Add(localArtifact);
+                    _save.marketPendingCoinDelta += coins - Coins;
+                Coins = coins;
+                Inventory.Add(localArtifact);
                 Toast($"Bought {localArtifact.displayName} locally");
                 Save();
                 return;
@@ -1150,7 +1375,7 @@ namespace DungeonDash
             try
             {
                 var response = await _onlineMarket.BuyAsync(listing.id);
-                if (response.artifact != null) _save.inventory.Add(response.artifact);
+                if (response.artifact != null) Inventory.Add(response.artifact);
                 SyncOnlineBalance();
                 Toast(response.message);
             }
@@ -1166,7 +1391,7 @@ namespace DungeonDash
             {
                 var localArtifact = _localMarket.Cancel(listing.id);
                 if (localArtifact == null) return;
-                _save.inventory.Add(localArtifact);
+                Inventory.Add(localArtifact);
                 Toast($"Returned {localArtifact.displayName}");
                 Save();
                 return;
@@ -1175,7 +1400,7 @@ namespace DungeonDash
             try
             {
                 var response = await _onlineMarket.CancelAsync(listing.id);
-                if (response.artifact != null) _save.inventory.Add(response.artifact);
+                if (response.artifact != null) Inventory.Add(response.artifact);
                 SyncOnlineBalance();
                 Toast(response.message);
             }
@@ -1265,7 +1490,7 @@ namespace DungeonDash
             float spawnT = Mathf.Clamp01((Time.time - _spawnTime) / SpawnTelegraphDuration);
             transform.localScale = Vector3.one * spawnT;
             _renderer.sortingOrder = YSort.Order(transform.position.y, 1);
-            if (!_game.PlayerAlive || !_game.WorldRunning) return;
+            if (!_game.PlayerAlive || !_game.CombatActive) return;
             Vector2 delta = _game.PlayerPosition - (Vector2)transform.position;
             _renderer.flipX = delta.x < 0f;
             _animationTime += Time.deltaTime;
@@ -1354,7 +1579,7 @@ namespace DungeonDash
 
         void Update()
         {
-            if (!_game.WorldRunning) return;
+            if (!_game.CombatActive) return;
             transform.position += (Vector3)(_direction * (11f * Time.deltaTime));
             var target = _game.ProjectileTarget(transform.position);
             if (target != null)
@@ -1390,7 +1615,7 @@ namespace DungeonDash
 
         void Update()
         {
-            if (!_game.WorldRunning) return;
+            if (!_game.CombatActive) return;
             if (_frames != null && _frames.Length > 0)
                 _renderer.sprite = _frames[Mathf.FloorToInt(Time.time * 8f) % _frames.Length];
             _renderer.sortingOrder = YSort.Order(transform.position.y, 0);

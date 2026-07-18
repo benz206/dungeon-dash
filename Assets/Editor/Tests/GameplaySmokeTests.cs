@@ -18,7 +18,6 @@ namespace DungeonDashTests
             var catalog = Resources.Load<GameCatalog>("GameCatalog");
             Assert.That(game, Is.Not.Null);
             Assert.That(catalog, Is.Not.Null);
-            Assert.That(GameObject.Find("Arena"), Is.Not.Null);
 
             foreach (var skin in catalog.characters)
             {
@@ -31,6 +30,7 @@ namespace DungeonDashTests
                 game.SendMessage("StartRun", skin);
                 yield return null;
 
+                Assert.That(GameObject.Find("Arena"), Is.Not.Null, $"{skin.id} did not build the dungeon");
                 var player = Object.FindFirstObjectByType<PlayerController>();
                 Assert.That(player, Is.Not.Null, $"{skin.id} did not create a player");
                 Assert.That(skin.idle.Contains(player.GetComponent<SpriteRenderer>().sprite), Is.True,
@@ -101,7 +101,7 @@ namespace DungeonDashTests
             var player = Object.FindFirstObjectByType<PlayerController>();
             player.TakeDamage(1, player.transform.position + Vector3.left);
             player.TakeDamage(1, player.transform.position + Vector3.left);
-            Assert.That(player.Health, Is.EqualTo(9));
+            Assert.That(player.Health, Is.EqualTo(player.MaxHealth - 1));
 
             yield return new ExitPlayMode();
         }

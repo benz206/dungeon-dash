@@ -36,19 +36,22 @@ namespace DungeonDash.EditorTools
             public string prefix;
             public float speed;   // Godot px/s; divided by 100 for Unity units/s
             public bool hasHit;
-            public CharDef(string id, string prefix, float speed, bool hasHit)
-            { this.id = id; this.prefix = prefix; this.speed = speed; this.hasHit = hasHit; }
+            public float maxHealth;  // hearts * 2; kept even for clean heart rendering
+            public float damageMod;  // multiplies artifact damage
+            public CharDef(string id, string prefix, float speed, bool hasHit, float maxHealth, float damageMod)
+            { this.id = id; this.prefix = prefix; this.speed = speed; this.hasHit = hasHit; this.maxHealth = maxHealth; this.damageMod = damageMod; }
         }
 
         // Playable roster + defaults from the Godot PlayerData.gd CHARACTER_DEFS.
+        // maxHealth/damageMod give each hero a distinct feel.
         static readonly CharDef[] Characters =
         {
-            new CharDef("knight",  "knight_f",  500f, true),
-            new CharDef("elf",     "elf_f",     540f, true),
-            new CharDef("dwarf",   "dwarf_f",   470f, true),
-            new CharDef("lizard",  "lizard_f",  560f, true),
-            new CharDef("wizzard", "wizzard_f", 495f, true),
-            new CharDef("doc",     "doc",       520f, false), // doc has no hit frame
+            new CharDef("knight",  "knight_f",  500f, true,  14f, 1.0f), // tank: high hp, normal dmg
+            new CharDef("elf",     "elf_f",     540f, true,   8f, 1.0f), // glass: low hp, fast
+            new CharDef("dwarf",   "dwarf_f",   470f, true,  14f, 1.1f), // heavy: high hp, slow, hits hard
+            new CharDef("lizard",  "lizard_f",  560f, true,  10f, 1.0f), // skirmisher: mid hp, fastest
+            new CharDef("wizzard", "wizzard_f", 495f, true,   8f, 1.5f), // mage: low hp, high dmg
+            new CharDef("doc",     "doc",       520f, false, 10f, 1.1f), // support: mid hp, slight dmg (no hit frame)
         };
 
         [MenuItem("Tools/Dungeon Dash/Generate Everything", false, 0)]
@@ -75,7 +78,9 @@ namespace DungeonDash.EditorTools
                     idle = LoadCharacterFrames(c.id, prefix, "idle"),
                     run = LoadCharacterFrames(c.id, prefix, "run"),
                     hit = LoadCharacterFrames(c.id, prefix, "hit"),
-                    speed = c.speed / 100f
+                    speed = c.speed / 100f,
+                    maxHealth = c.maxHealth,
+                    damageMod = c.damageMod
                 })).ToArray();
 
             catalog.enemies = AssetDatabase.GetSubFolders("Assets/Art/Enemies")

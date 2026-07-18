@@ -14,6 +14,8 @@ namespace DungeonDash
             public Sprite[] run;
             public Sprite[] hit;
             public float speed;
+            public float maxHealth;
+            public float damageMod;
         }
 
         [Serializable]

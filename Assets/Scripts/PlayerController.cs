@@ -28,13 +28,18 @@ namespace DungeonDash
         const float DashDuration = 0.16f;
         const float DashCooldown = 0.75f;
 
-        public int Health { get; private set; } = 10;
-        public int MaxHealth => 10;
+        public int Health { get; private set; }
+        public int MaxHealth { get; private set; } = 10;
+        public float DamageMod { get; private set; } = 1f;
 
         public void Setup(DungeonGame game, GameCatalog.CharacterSkin skin)
         {
             _game = game;
             _skin = skin;
+            // Un-regenerated catalogs deserialize maxHealth/damageMod as 0 — fall back to sane defaults.
+            MaxHealth = skin.maxHealth > 0f ? Mathf.RoundToInt(skin.maxHealth) : 10;
+            Health = MaxHealth;
+            DamageMod = skin.damageMod > 0f ? skin.damageMod : 1f;
             _body = GetComponent<Rigidbody2D>();
             _renderer = GetComponent<SpriteRenderer>();
             _body.gravityScale = 0f;
@@ -110,7 +115,7 @@ namespace DungeonDash
             if (artifact == null || Time.time < _nextAttack) return;
             _nextAttack = Time.time + 1f / artifact.attacksPerSecond;
             bool critical = Random.value < artifact.criticalChance;
-            int damage = artifact.EffectiveDamage * (critical ? 2 : 1);
+            int damage = Mathf.RoundToInt(artifact.EffectiveDamage * DamageMod) * (critical ? 2 : 1);
             _game.UseWeapon(transform.position + (Vector3)(_aim * 0.75f), _aim,
                 damage, artifact.weaponId, _weaponRenderer.sprite, critical);
         }
