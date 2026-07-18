@@ -111,6 +111,7 @@ namespace DungeonDash
 
         void TryAttack()
         {
+            if (!_game.CombatActive) return; // no attacks outside the dungeon (e.g. the hub)
             var artifact = _game.EquippedArtifact;
             if (artifact == null || Time.time < _nextAttack) return;
             _nextAttack = Time.time + 1f / artifact.attacksPerSecond;

@@ -37,6 +37,8 @@ namespace DungeonDash
         public EnemySkin[] enemies;
         public NamedSprite[] weapons;
         public Sprite[] floors;
+        public Sprite[] grass;
+        public Sprite[] paths;
         public Sprite[] walls;
         public Sprite[] coins;
         public Sprite[] potions;

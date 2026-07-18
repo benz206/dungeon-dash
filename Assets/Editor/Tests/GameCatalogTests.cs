@@ -35,7 +35,8 @@ namespace DungeonDashTests
             AssertComplete("Assets/Art/Enemies", _catalog.enemies
                 .SelectMany(x => x.idle.Concat(x.run)));
             AssertComplete("Assets/Art/Weapons", _catalog.weapons.Select(x => x.sprite));
-            AssertComplete("Assets/Art/Tiles", _catalog.floors.Concat(_catalog.walls));
+            AssertComplete("Assets/Art/Tiles", _catalog.floors.Concat(_catalog.walls)
+                .Concat(_catalog.grass).Concat(_catalog.paths));
             AssertComplete("Assets/Art/Items", _catalog.coins.Concat(_catalog.potions)
                 .Concat(_catalog.chests).Concat(_catalog.bombs));
             AssertComplete("Assets/Art/UI", new[]

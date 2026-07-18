@@ -27,6 +27,8 @@ MonoBehaviour:
     hit:
     - {fileID: 21300000, guid: c4c6925458584e23822e2f9f5ed1f94c, type: 3}
     speed: 5
+    maxHealth: 14
+    damageMod: 1
   - id: knight_m
     idle:
     - {fileID: 21300000, guid: f39226350a5060aee077c7d160b1c29f, type: 3}
@@ -41,6 +43,8 @@ MonoBehaviour:
     hit:
     - {fileID: 21300000, guid: 0883dc6e767391ac195d33cac990ff87, type: 3}
     speed: 5
+    maxHealth: 14
+    damageMod: 1
   - id: elf
     idle:
     - {fileID: 21300000, guid: b360eeffc29ff4f0edd6675c33596f34, type: 3}
@@ -55,6 +59,8 @@ MonoBehaviour:
     hit:
     - {fileID: 21300000, guid: b767015ef6b72b7cc2410298f4565628, type: 3}
     speed: 5.4
+    maxHealth: 8
+    damageMod: 1
   - id: elf_m
     idle:
     - {fileID: 21300000, guid: 4d46235854ca70525cd8c81be21928cd, type: 3}
@@ -69,6 +75,8 @@ MonoBehaviour:
     hit:
     - {fileID: 21300000, guid: b4f81fc0ffb1384b348b84b3f46d7448, type: 3}
     speed: 5.4
+    maxHealth: 8
+    damageMod: 1
   - id: dwarf
     idle:
     - {fileID: 21300000, guid: 99694a59eb87fe6264030b1745593a94, type: 3}
@@ -83,6 +91,8 @@ MonoBehaviour:
     hit:
     - {fileID: 21300000, guid: 74003c05f6648fd1735302da7423e0cf, type: 3}
     speed: 4.7
+    maxHealth: 14
+    damageMod: 1.1
   - id: dwarf_m
     idle:
     - {fileID: 21300000, guid: 7b48c2642ace46d1bdef94b8ab9f6647, type: 3}
@@ -97,6 +107,8 @@ MonoBehaviour:
     hit:
     - {fileID: 21300000, guid: 7f347b58e7fd30b919bc625cfa08dbd2, type: 3}
     speed: 4.7
+    maxHealth: 14
+    damageMod: 1.1
   - id: lizard
     idle:
     - {fileID: 21300000, guid: 2f34132d2657831997c1871f25650edc, type: 3}
@@ -111,6 +123,8 @@ MonoBehaviour:
     hit:
     - {fileID: 21300000, guid: 19002dabd1d55b31ecd099b3a194c71b, type: 3}
     speed: 5.6
+    maxHealth: 10
+    damageMod: 1
   - id: lizard_m
     idle:
     - {fileID: 21300000, guid: c865149b6ecb333dbad227a6f7efaf37, type: 3}
@@ -125,6 +139,8 @@ MonoBehaviour:
     hit:
     - {fileID: 21300000, guid: 4477e6d9a1c296aa83e0629db5392d1a, type: 3}
     speed: 5.6
+    maxHealth: 10
+    damageMod: 1
   - id: wizzard
     idle:
     - {fileID: 21300000, guid: c37a94445d3fe22984ad0d45de74f681, type: 3}
@@ -139,6 +155,8 @@ MonoBehaviour:
     hit:
     - {fileID: 21300000, guid: 081fa22526c6c719d6b428e3a5f7a0ef, type: 3}
     speed: 4.95
+    maxHealth: 8
+    damageMod: 1.5
   - id: wizzard_m
     idle:
     - {fileID: 21300000, guid: a331acdc40f0f892b3f2348a46ec6a65, type: 3}
@@ -153,6 +171,8 @@ MonoBehaviour:
     hit:
     - {fileID: 21300000, guid: 14e36debc3f28ca3906717d6b57ea53b, type: 3}
     speed: 4.95
+    maxHealth: 8
+    damageMod: 1.5
   - id: doc
     idle:
     - {fileID: 21300000, guid: 6b4d9a61e5a2e8318c60ca6de8a9e96e, type: 3}
@@ -166,6 +186,8 @@ MonoBehaviour:
     - {fileID: 21300000, guid: 7442d5426ab54134a4979f4a921d3216, type: 3}
     hit: []
     speed: 5.2
+    maxHealth: 10
+    damageMod: 1.1
   enemies:
   - id: angel
     idle:
@@ -462,6 +484,16 @@ MonoBehaviour:
   - {fileID: 21300000, guid: aa27940e7b84268615a50924374d9454, type: 3}
   - {fileID: 21300000, guid: c31e581d21aaae58fc8f96719595d565, type: 3}
   - {fileID: 21300000, guid: fbdbf60a59db8333faa1d21e3167fd17, type: 3}
+  grass:
+  - {fileID: 21300000, guid: 792363270f004c4c84240062a8e39597, type: 3}
+  - {fileID: 21300000, guid: 056eaa0cedab4794b6c921c08f65b63c, type: 3}
+  - {fileID: 21300000, guid: ceabada02e6b43d591141b8048fa9aec, type: 3}
+  - {fileID: 21300000, guid: 459fd2391997411dae87b9037341512b, type: 3}
+  paths:
+  - {fileID: 21300000, guid: 580bef40c1a747df8cebfc129ae05f32, type: 3}
+  - {fileID: 21300000, guid: 26e2558ef5344c97853fca032e3e16a1, type: 3}
+  - {fileID: 21300000, guid: ce6c9edcea2348fa9d47174285635477, type: 3}
+  - {fileID: 21300000, guid: 1ebccfedbef1431c8cc1f0bbcebb48c5, type: 3}
   walls:
   - {fileID: 21300000, guid: bb852350b0952a6a52d5fe9ed37fef12, type: 3}
   - {fileID: 21300000, guid: 3ffe794ac11afc7514c3c390d4649fec, type: 3}

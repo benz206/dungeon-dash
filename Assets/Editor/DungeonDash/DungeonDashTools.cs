@@ -102,7 +102,9 @@ namespace DungeonDash.EditorTools
 
             var tiles = LoadSprites(ArtTiles);
             catalog.floors = tiles.Where(x => Regex.IsMatch(x.name, @"^floor_\d+$")).ToArray();
-            catalog.walls = tiles.Where(x => !Regex.IsMatch(x.name, @"^floor_\d+$")).ToArray();
+            catalog.grass = tiles.Where(x => Regex.IsMatch(x.name, @"^grass_\d+$")).ToArray();
+            catalog.paths = tiles.Where(x => Regex.IsMatch(x.name, @"^path_\d+$")).ToArray();
+            catalog.walls = tiles.Where(x => !Regex.IsMatch(x.name, @"^(floor|grass|path)_\d+$")).ToArray();
             catalog.coins = LoadSprites("Assets/Art/Items/coin");
             catalog.potions = LoadSprites("Assets/Art/Items/potion");
             catalog.chests = LoadSprites("Assets/Art/Items/chest");

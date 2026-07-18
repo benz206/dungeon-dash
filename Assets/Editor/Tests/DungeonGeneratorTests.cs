@@ -136,6 +136,11 @@ namespace DungeonDashTests
         {
             yield return new EnterPlayMode();
 
+            var game = Object.FindFirstObjectByType<DungeonGame>();
+            var catalog = Resources.Load<GameCatalog>("GameCatalog");
+            game.SendMessage("StartRun", catalog.characters[0]);
+            yield return null;
+
             var arena = GameObject.Find("Arena");
             var renderers = arena.GetComponentsInChildren<SpriteRenderer>();
             var walls = renderers.Where(renderer => renderer.name.StartsWith("Wall ")).ToArray();

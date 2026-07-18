@@ -203,6 +203,28 @@ namespace DungeonDash
             return pool[random.Next(pool.Length)];
         }
 
+        // Path and grass tiles are chosen by a stable per-cell hash so a given layout renders
+        // identically every frame without consuming the generator's random stream.
+        public static Sprite SelectPath(Sprite[] paths, Vector2Int cell) =>
+            paths[StableHash(cell) % paths.Length];
+
+        public static Sprite SelectGrass(Sprite[] grass, Vector2Int cell) =>
+            grass[StableHash(cell) % grass.Length];
+
+        // Roughly one room in four is a grass biome, keyed on a stable hash of its center.
+        public static bool IsGrassRoom(DungeonRoom room) => StableHash(room.Center) % 4 == 0;
+
+        static int StableHash(Vector2Int cell)
+        {
+            unchecked
+            {
+                int h = 17;
+                h = h * 31 + cell.x;
+                h = h * 31 + cell.y;
+                return h & 0x7fffffff;
+            }
+        }
+
         public static Sprite FindByName(IEnumerable<Sprite> sprites, string name) =>
             sprites.First(sprite => sprite.name == name);
 

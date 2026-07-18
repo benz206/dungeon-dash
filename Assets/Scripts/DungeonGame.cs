@@ -276,10 +276,27 @@ namespace DungeonDash
             foreach (var cell in layout.Walkable)
             {
                 float age = layout.FloorAge[cell];
-                var sprite = DungeonTileSelector.SelectFloor(_catalog.floors, age, _random);
+                Sprite sprite;
+                Color tint;
+                if (layout.Corridors.Contains(cell) && _catalog.paths.Length > 0)
+                {
+                    sprite = DungeonTileSelector.SelectPath(_catalog.paths, cell);
+                    tint = Color.white; // preserve authored path color
+                }
+                else if (_catalog.grass.Length > 0 &&
+                    layout.Rooms.Any(room => DungeonTileSelector.IsGrassRoom(room) && room.Bounds.Contains(cell)))
+                {
+                    sprite = DungeonTileSelector.SelectGrass(_catalog.grass, cell);
+                    tint = Color.white; // preserve authored grass color
+                }
+                else
+                {
+                    sprite = DungeonTileSelector.SelectFloor(_catalog.floors, age, _random);
+                    tint = new Color(0.58f, 0.62f, 0.68f); // grey to sink stone into the dark
+                }
                 var floor = CreateSprite($"Floor {cell.x},{cell.y} age {age:0.00}", sprite,
                     new Vector2(cell.x, cell.y), -20, root);
-                floor.GetComponent<SpriteRenderer>().color = new Color(0.58f, 0.62f, 0.68f);
+                floor.GetComponent<SpriteRenderer>().color = tint;
             }
 
             var roomBounds = layout.Rooms.Select(room => room.Bounds).ToList();
