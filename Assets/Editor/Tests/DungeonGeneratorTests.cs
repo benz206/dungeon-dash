@@ -17,14 +17,13 @@ namespace DungeonDashTests
         };
 
         [Test]
-        public void Generate_CreatesConnectedRoomsAndOpenDoorways()
+        public void Generate_CreatesConnectedRooms()
         {
             var layout = DungeonGenerator.Generate(new System.Random(7));
 
-            Assert.That(layout.Rooms, Has.Count.EqualTo(7));
+            Assert.That(layout.Rooms.Count, Is.InRange(4, 30));
             Assert.That(layout.Corridors, Is.Not.Empty);
-            Assert.That(layout.Doors, Is.Not.Empty);
-            Assert.That(layout.Doors.All(door => door.IsOpen && layout.Walkable.Contains(door.Position)), Is.True);
+            Assert.That(layout.Walkable, Does.Contain(Vector2Int.zero));
 
             var reached = new HashSet<Vector2Int> { Vector2Int.zero };
             var pending = new Queue<Vector2Int>();
@@ -49,6 +48,8 @@ namespace DungeonDashTests
             for (int seed = 0; seed < 100; seed++)
             {
                 var layout = DungeonGenerator.Generate(new System.Random(seed));
+                Assert.That(layout.Rooms.Count, Is.GreaterThanOrEqualTo(4), $"Seed {seed} created too few rooms");
+
                 for (int first = 0; first < layout.Rooms.Count; first++)
                 for (int second = first + 1; second < layout.Rooms.Count; second++)
                     Assert.That(layout.Rooms[first].Bounds.Overlaps(layout.Rooms[second].Bounds), Is.False,
@@ -69,6 +70,23 @@ namespace DungeonDashTests
 
                 Assert.That(reached, Has.Count.EqualTo(layout.Walkable.Count),
                     $"Seed {seed} created unreachable floor tiles");
+
+                bool foundBannerRow = false;
+                for (int i = 1; i < layout.Rooms.Count && !foundBannerRow; i++)
+                {
+                    var room = layout.Rooms[i];
+                    for (int x = room.Bounds.xMin; x < room.Bounds.xMax; x++)
+                    {
+                        var cell = new Vector2Int(x, room.Bounds.yMax);
+                        if (!layout.Walls.Contains(cell)) continue;
+                        if (DungeonTileSelector.WallSpriteName(layout, cell) != "wall_top_mid") continue;
+                        foundBannerRow = true;
+                        break;
+                    }
+                }
+
+                Assert.That(foundBannerRow, Is.True,
+                    $"Seed {seed} had no satellite room with a wall_top_mid cell in its top wall row");
             }
         }
 
@@ -76,25 +94,27 @@ namespace DungeonDashTests
         public void WallSelection_UsesOnlyStructuralSprites()
         {
             var layout = DungeonGenerator.Generate(new System.Random(11));
-            var structuralNames = new HashSet<string>
-            {
-                "wall_top_left", "wall_top_mid", "wall_top_right", "edge_down",
-                "wall_left", "wall_mid", "wall_right"
-            };
 
             Assert.That(layout.Walls.Select(cell => DungeonTileSelector.WallSpriteName(layout, cell))
-                .All(structuralNames.Contains), Is.True);
+                .All(DungeonTileSelector.StructuralWallSpriteNames.Contains), Is.True);
+
+            Assert.That(DungeonTileSelector.StructuralWallSpriteNames, Is.EquivalentTo(new[]
+            {
+                "wall_mid", "wall_top_mid", "wall_top_left", "wall_top_right", "edge_down",
+                "wall_edge_bottom_left", "wall_edge_bottom_right", "wall_left", "wall_right",
+                "wall_edge_left", "wall_edge_right", "wall_edge_mid_left", "wall_edge_mid_right",
+                "wall_edge_top_left", "wall_edge_top_right", "wall_edge_tshape_left", "wall_edge_tshape_right",
+                "wall_edge_tshape_bottom_left", "wall_edge_tshape_bottom_right", "wall_outer_top_left",
+                "wall_outer_top_right", "wall_outer_mid_left", "wall_outer_mid_right", "wall_outer_front_left",
+                "wall_outer_front_right", "column_wall"
+            }));
         }
 
         [Test]
-        public void SemanticSelection_DistinguishesDoorStateAndBannerColor()
+        public void SemanticSelection_ResolvesBannerSprites()
         {
             var catalog = AssetDatabase.LoadAssetAtPath<GameCatalog>("Assets/Resources/GameCatalog.asset");
 
-            Assert.That(DungeonTileSelector.FindByName(catalog.walls,
-                DungeonTileSelector.DoorSpriteName(true)).name, Is.EqualTo("doors_leaf_open"));
-            Assert.That(DungeonTileSelector.FindByName(catalog.walls,
-                DungeonTileSelector.DoorSpriteName(false)).name, Is.EqualTo("doors_leaf_closed"));
             Assert.That(DungeonTileSelector.FindByName(catalog.walls,
                 "wall_banner_blue").name, Is.EqualTo("wall_banner_blue"));
         }
@@ -112,32 +132,30 @@ namespace DungeonDashTests
         }
 
         [UnityTest]
-        public IEnumerator Arena_RendersSemanticWallsDoorsAndBanners()
+        public IEnumerator Arena_RendersSemanticWallsAndBanners()
         {
             yield return new EnterPlayMode();
 
             var arena = GameObject.Find("Arena");
             var renderers = arena.GetComponentsInChildren<SpriteRenderer>();
             var walls = renderers.Where(renderer => renderer.name.StartsWith("Wall ")).ToArray();
-            var doors = renderers.Where(renderer => renderer.name == "Door open").ToArray();
             var banners = renderers.Where(renderer => renderer.name.StartsWith("Banner ")).ToArray();
 
             Assert.That(walls, Is.Not.Empty);
-            Assert.That(walls.All(renderer => renderer.sprite.name is "wall_top_left" or "wall_top_mid" or
-                "wall_top_right" or "edge_down" or "wall_left" or "wall_mid" or "wall_right"), Is.True);
-            Assert.That(doors, Is.Not.Empty);
-            Assert.That(doors.All(renderer => renderer.sprite.name == "doors_leaf_open"), Is.True);
+            Assert.That(walls.All(renderer => DungeonTileSelector.StructuralWallSpriteNames.Contains(renderer.sprite.name)), Is.True);
             Assert.That(banners, Is.Not.Empty);
             Assert.That(banners.All(renderer => renderer.sprite.name.StartsWith("wall_banner_")), Is.True);
 
             yield return new ExitPlayMode();
         }
 
+        static readonly HashSet<string> DamagedFloorNames = new() { "floor_4", "floor_6", "floor_7", "floor_8" };
+
         static int CountDamaged(Sprite[] floors, float age, System.Random random)
         {
             int count = 0;
             for (int i = 0; i < 2000; i++)
-                if (DungeonTileSelector.SelectFloor(floors, age, random).name != "floor_1") count++;
+                if (DamagedFloorNames.Contains(DungeonTileSelector.SelectFloor(floors, age, random).name)) count++;
             return count;
         }
     }

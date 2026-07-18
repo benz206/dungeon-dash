@@ -220,6 +220,18 @@ namespace DungeonDash
             camera.backgroundColor = new Color(0.035f, 0.045f, 0.07f);
         }
 
+        static readonly Vector2Int[] EightNeighborOffsets =
+        {
+            new(-1, -1), new(0, -1), new(1, -1),
+            new(-1, 0), new(1, 0),
+            new(-1, 1), new(0, 1), new(1, 1)
+        };
+
+        static readonly Vector2Int[] CardinalOffsets =
+        {
+            Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right
+        };
+
         void BuildArena()
         {
             var root = new GameObject("Arena").transform;
@@ -235,31 +247,43 @@ namespace DungeonDash
                 floor.GetComponent<SpriteRenderer>().color = new Color(0.58f, 0.62f, 0.68f);
             }
 
+            var roomBounds = layout.Rooms.Select(room => room.Bounds).ToList();
+            var decorations = WallClassifier.PlanDecorations(layout.Walkable.Contains, layout.GridBounds, roomBounds);
+            var wallDistances = ComputeWallDistances(layout);
+
             foreach (var cell in layout.Walls)
             {
-                string spriteName = DungeonTileSelector.WallSpriteName(layout, cell);
-                CreateWall(new Vector2(cell.x, cell.y),
-                    DungeonTileSelector.FindByName(_catalog.walls, spriteName), spriteName, root);
-            }
+                bool hasDecoration = decorations.TryGetValue(cell, out var decoration);
+                string spriteName = hasDecoration ? decoration.SpriteName : DungeonTileSelector.WallSpriteName(layout, cell);
+                string prefix = !hasDecoration ? "Wall" : decoration.Kind == WallDecorationKind.Banner ? "Banner" : "Decor";
+                int dist = hasDecoration ? 1 : wallDistances.GetValueOrDefault(cell, int.MaxValue);
+                float brightness = Mathf.Lerp(1f, 0.3f, Mathf.InverseLerp(1f, 5f, dist));
+                var sprite = DungeonTileSelector.FindByName(_catalog.walls, spriteName);
+                var position = new Vector2(cell.x, cell.y);
+                bool hasCollider = HasWalkableNeighbor(layout, cell);
 
-            foreach (var door in layout.Doors)
-            {
-                string spriteName = DungeonTileSelector.DoorSpriteName(door.IsOpen);
-                var go = CreateSprite(door.IsOpen ? "Door open" : "Door closed",
-                    DungeonTileSelector.FindByName(_catalog.walls, spriteName),
-                    new Vector2(door.Position.x, door.Position.y), -10, root);
-                if (!door.IsOpen) go.AddComponent<BoxCollider2D>();
-            }
+                GameObject wallGo;
+                if (spriteName == "column_wall")
+                {
+                    wallGo = CreateColumnWall(position, sprite, $"{prefix} {spriteName}", root, brightness, hasCollider);
+                }
+                else
+                {
+                    wallGo = CreateWall(position, sprite, $"{prefix} {spriteName}", root, brightness);
+                    if (hasCollider) wallGo.AddComponent<BoxCollider2D>();
+                }
 
-            string[] banners = { "wall_banner_blue", "wall_banner_green", "wall_banner_red", "wall_banner_yellow" };
-            for (int i = 1; i < layout.Rooms.Count; i++)
-            {
-                var room = layout.Rooms[i];
-                var position = new Vector2Int(room.Center.x, room.Bounds.yMax);
-                if (!layout.Walls.Contains(position)) continue;
-                string spriteName = banners[(i - 1) % banners.Length];
-                CreateSprite($"Banner {spriteName}", DungeonTileSelector.FindByName(_catalog.walls, spriteName),
-                    new Vector2(position.x, position.y), -4, root);
+                if (hasDecoration && decoration.AnimFrameNames != null &&
+                    (decoration.Kind == WallDecorationKind.FountainMid || decoration.Kind == WallDecorationKind.FountainBasin))
+                {
+                    var frames = decoration.AnimFrameNames
+                        .Select(name => DungeonTileSelector.FindByName(_catalog.walls, name)).ToArray();
+                    var renderer = wallGo.GetComponent<SpriteRenderer>();
+                    renderer.sprite = frames[0];
+                    var loop = wallGo.AddComponent<SpriteFrameLoop>();
+                    loop.Frames = frames;
+                    loop.Fps = 5f;
+                }
             }
 
             _enemySpawnPoints.Clear();
@@ -269,11 +293,58 @@ namespace DungeonDash
                 .Select(cell => new Vector2(cell.x, cell.y)));
         }
 
-        void CreateWall(Vector2 position, Sprite sprite, string semanticName, Transform parent)
+        static Dictionary<Vector2Int, int> ComputeWallDistances(DungeonLayout layout)
         {
-            var go = CreateSprite($"Wall {semanticName}", sprite, position, -5, parent);
-            go.GetComponent<SpriteRenderer>().color = new Color(0.68f, 0.72f, 0.78f);
-            go.AddComponent<BoxCollider2D>();
+            var distances = new Dictionary<Vector2Int, int>();
+            var frontier = new Queue<Vector2Int>();
+            foreach (var wall in layout.Walls)
+            {
+                if (!CardinalOffsets.Any(offset => layout.Walkable.Contains(wall + offset))) continue;
+                distances[wall] = 1;
+                frontier.Enqueue(wall);
+            }
+
+            while (frontier.Count > 0)
+            {
+                var cell = frontier.Dequeue();
+                int next = distances[cell] + 1;
+                foreach (var offset in CardinalOffsets)
+                {
+                    var neighbor = cell + offset;
+                    if (!layout.Walls.Contains(neighbor) || distances.ContainsKey(neighbor)) continue;
+                    distances[neighbor] = next;
+                    frontier.Enqueue(neighbor);
+                }
+            }
+
+            return distances;
+        }
+
+        static bool HasWalkableNeighbor(DungeonLayout layout, Vector2Int cell) =>
+            EightNeighborOffsets.Any(offset => layout.Walkable.Contains(cell + offset));
+
+        static Color WallTint(float brightness) => new(0.68f * brightness, 0.72f * brightness, 0.78f * brightness);
+
+        GameObject CreateWall(Vector2 position, Sprite sprite, string name, Transform parent, float brightness)
+        {
+            var go = CreateSprite(name, sprite, position, -5, parent);
+            go.GetComponent<SpriteRenderer>().color = WallTint(brightness);
+            return go;
+        }
+
+        GameObject CreateColumnWall(Vector2 position, Sprite sprite, string name, Transform parent, float brightness, bool hasCollider)
+        {
+            var go = new GameObject(name);
+            go.transform.position = position;
+            go.transform.SetParent(parent);
+            if (hasCollider)
+            {
+                var collider = go.AddComponent<BoxCollider2D>();
+                collider.size = Vector2.one;
+            }
+            var child = CreateSprite(name, sprite, position + new Vector2(0f, -1f), -4, go.transform);
+            child.GetComponent<SpriteRenderer>().color = WallTint(brightness);
+            return go;
         }
 
         static GameObject CreateSprite(string name, Sprite sprite, Vector2 position, int order, Transform parent = null)

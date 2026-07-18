@@ -18,113 +18,70 @@ namespace DungeonDash
         }
     }
 
-    public readonly struct DungeonDoor
-    {
-        public Vector2Int Position { get; }
-        public bool IsOpen { get; }
-
-        public DungeonDoor(Vector2Int position, bool isOpen)
-        {
-            Position = position;
-            IsOpen = isOpen;
-        }
-    }
-
     public sealed class DungeonLayout
     {
         public List<DungeonRoom> Rooms { get; } = new();
         public HashSet<Vector2Int> Walkable { get; } = new();
         public HashSet<Vector2Int> Corridors { get; } = new();
         public HashSet<Vector2Int> Walls { get; } = new();
-        public List<DungeonDoor> Doors { get; } = new();
         public Dictionary<Vector2Int, float> FloorAge { get; } = new();
+        public RectInt GridBounds { get; set; }
     }
 
     public static class DungeonGenerator
     {
-        const int SatelliteRoomCount = 6;
-
-        static readonly Vector2Int[] CardinalDirections =
-        {
-            Vector2Int.left, Vector2Int.right, Vector2Int.up, Vector2Int.down
-        };
-
-        static readonly Vector2Int[] RoomAnchors =
-        {
-            new(-14, -10), new(0, -10), new(14, -10),
-            new(-14, 0),                    new(14, 0),
-            new(-14, 10),  new(0, 10),     new(14, 10)
-        };
+        const int GridWidth = 56;
+        const int GridHeight = 36;
+        const int Margin = 4;
+        const int MinRoomSize = 5;
+        const int MaxRoomSize = 11;
+        const int MinRooms = 4;
+        const int BaseAttempts = 30;
+        const int HardAttemptCap = 120;
 
         public static DungeonLayout Generate(System.Random random)
         {
             var layout = new DungeonLayout();
-            AddRoom(layout, new RectInt(-3, -3, 7, 7), random);
 
-            var anchors = RoomAnchors.ToArray();
-            for (int i = anchors.Length - 1; i > 0; i--)
+            int attempts = 0;
+            while (attempts < BaseAttempts || (layout.Rooms.Count < MinRooms && attempts < HardAttemptCap))
             {
-                int swapIndex = random.Next(i + 1);
-                (anchors[i], anchors[swapIndex]) = (anchors[swapIndex], anchors[i]);
+                attempts++;
+                int width = random.Next(MinRoomSize, MaxRoomSize + 1);
+                int height = random.Next(MinRoomSize, MaxRoomSize + 1);
+                int x = random.Next(Margin, GridWidth - Margin - width);
+                int y = random.Next(Margin, GridHeight - Margin - height);
+                var bounds = new RectInt(x, y, width, height);
+                if (OverlapsExistingRoom(layout, bounds)) continue;
+                AddRoom(layout, bounds, random);
             }
 
-            for (int i = 0; i < SatelliteRoomCount; i++)
-                AddRoom(layout, SatelliteRoom(anchors[i], random), random);
-
-            ConnectClosestRooms(layout, random);
+            ConnectChain(layout, random);
 
             foreach (var cell in layout.Corridors)
             {
                 layout.Walkable.Add(cell);
                 layout.FloorAge[cell] = 0.15f;
-                if (CardinalDirections.Any(direction => IsRoomFloor(layout, cell + direction)) &&
-                    layout.Doors.All(door => door.Position != cell))
-                    layout.Doors.Add(new DungeonDoor(cell, true));
             }
 
-            foreach (var cell in layout.Walkable)
-            foreach (var offset in SurroundingOffsets())
-                if (!layout.Walkable.Contains(cell + offset)) layout.Walls.Add(cell + offset);
+            var offset = Vector2Int.zero - layout.Rooms[0].Center;
+            Translate(layout, offset);
+            layout.GridBounds = new RectInt(offset.x, offset.y, GridWidth, GridHeight);
+
+            foreach (var cell in Cells(layout.GridBounds))
+                if (!layout.Walkable.Contains(cell)) layout.Walls.Add(cell);
 
             return layout;
         }
 
-        static RectInt SatelliteRoom(Vector2Int anchor, System.Random random)
+        static bool OverlapsExistingRoom(DungeonLayout layout, RectInt candidate)
         {
-            int width = random.Next(5, 9);
-            int height = random.Next(4, 7);
-            int centerX = anchor.x + random.Next(-2, 3);
-            int centerY = anchor.y + random.Next(-1, 2);
-            return new RectInt(centerX - width / 2, centerY - height / 2, width, height);
+            var inflated = Inflate(candidate, 1);
+            return layout.Rooms.Any(room => inflated.Overlaps(room.Bounds));
         }
 
-        static void ConnectClosestRooms(DungeonLayout layout, System.Random random)
-        {
-            var connected = new HashSet<int> { 0 };
-            while (connected.Count < layout.Rooms.Count)
-            {
-                int closestFrom = 0;
-                int closestTo = 0;
-                int closestDistance = int.MaxValue;
-                foreach (int from in connected)
-                for (int to = 0; to < layout.Rooms.Count; to++)
-                {
-                    if (connected.Contains(to)) continue;
-                    int distance = ManhattanDistance(layout.Rooms[from].Center, layout.Rooms[to].Center);
-                    if (distance >= closestDistance) continue;
-                    closestFrom = from;
-                    closestTo = to;
-                    closestDistance = distance;
-                }
-
-                Connect(layout, layout.Rooms[closestFrom].Center, layout.Rooms[closestTo].Center,
-                    random.Next(2) == 0);
-                connected.Add(closestTo);
-            }
-        }
-
-        static int ManhattanDistance(Vector2Int a, Vector2Int b) =>
-            Math.Abs(a.x - b.x) + Math.Abs(a.y - b.y);
+        static RectInt Inflate(RectInt rect, int amount) =>
+            new(rect.xMin - amount, rect.yMin - amount, rect.width + amount * 2, rect.height + amount * 2);
 
         static void AddRoom(DungeonLayout layout, RectInt bounds, System.Random random)
         {
@@ -137,23 +94,86 @@ namespace DungeonDash
             }
         }
 
-        static void Connect(DungeonLayout layout, Vector2Int from, Vector2Int to, bool horizontalFirst)
+        static void ConnectChain(DungeonLayout layout, System.Random random)
         {
-            var corner = horizontalFirst ? new Vector2Int(to.x, from.y) : new Vector2Int(from.x, to.y);
-            CarveLine(layout, from, corner);
-            CarveLine(layout, corner, to);
+            for (int i = 1; i < layout.Rooms.Count; i++)
+            {
+                var from = layout.Rooms[i - 1].Center;
+                var to = layout.Rooms[i].Center;
+                Connect(layout, from, to, random.Next(2) == 0);
+            }
         }
 
-        static void CarveLine(DungeonLayout layout, Vector2Int from, Vector2Int to)
+        static void Connect(DungeonLayout layout, Vector2Int from, Vector2Int to, bool horizontalFirst)
         {
-            var direction = new Vector2Int(Math.Sign(to.x - from.x), Math.Sign(to.y - from.y));
-            var cell = from;
-            while (true)
+            Vector2Int corner;
+            if (horizontalFirst)
             {
-                if (!IsRoomFloor(layout, cell)) layout.Corridors.Add(cell);
-                if (cell == to) break;
-                cell += direction;
+                corner = new Vector2Int(to.x, from.y);
+                CarveHorizontalLeg(layout, from.x, to.x, from.y);
+                CarveVerticalLeg(layout, from.y, to.y, to.x);
             }
+            else
+            {
+                corner = new Vector2Int(from.x, to.y);
+                CarveVerticalLeg(layout, from.y, to.y, from.x);
+                CarveHorizontalLeg(layout, from.x, to.x, to.y);
+            }
+
+            // Guarantee a full 2x2 at the elbow regardless of leg travel direction.
+            CarveCorridorCell(layout, corner);
+            CarveCorridorCell(layout, corner + Vector2Int.right);
+            CarveCorridorCell(layout, corner + Vector2Int.up);
+            CarveCorridorCell(layout, corner + Vector2Int.right + Vector2Int.up);
+        }
+
+        static void CarveHorizontalLeg(DungeonLayout layout, int xFrom, int xTo, int y)
+        {
+            int xMin = Math.Min(xFrom, xTo);
+            int xMax = Math.Max(xFrom, xTo);
+            for (int x = xMin; x <= xMax; x++)
+            {
+                CarveCorridorCell(layout, new Vector2Int(x, y));
+                CarveCorridorCell(layout, new Vector2Int(x, y + 1));
+            }
+        }
+
+        static void CarveVerticalLeg(DungeonLayout layout, int yFrom, int yTo, int x)
+        {
+            int yMin = Math.Min(yFrom, yTo);
+            int yMax = Math.Max(yFrom, yTo);
+            for (int y = yMin; y <= yMax; y++)
+            {
+                CarveCorridorCell(layout, new Vector2Int(x, y));
+                CarveCorridorCell(layout, new Vector2Int(x + 1, y));
+            }
+        }
+
+        static void CarveCorridorCell(DungeonLayout layout, Vector2Int cell)
+        {
+            if (IsRoomFloor(layout, cell)) return;
+            layout.Corridors.Add(cell);
+        }
+
+        static void Translate(DungeonLayout layout, Vector2Int offset)
+        {
+            var rooms = layout.Rooms.Select(room => new DungeonRoom(
+                new RectInt(room.Bounds.xMin + offset.x, room.Bounds.yMin + offset.y, room.Bounds.width, room.Bounds.height),
+                room.Age)).ToList();
+            layout.Rooms.Clear();
+            layout.Rooms.AddRange(rooms);
+
+            var walkable = layout.Walkable.Select(cell => cell + offset).ToList();
+            layout.Walkable.Clear();
+            layout.Walkable.UnionWith(walkable);
+
+            var corridors = layout.Corridors.Select(cell => cell + offset).ToList();
+            layout.Corridors.Clear();
+            layout.Corridors.UnionWith(corridors);
+
+            var floorAge = layout.FloorAge.Select(pair => (cell: pair.Key + offset, age: pair.Value)).ToList();
+            layout.FloorAge.Clear();
+            foreach (var entry in floorAge) layout.FloorAge[entry.cell] = entry.age;
         }
 
         static bool IsRoomFloor(DungeonLayout layout, Vector2Int cell) =>
@@ -165,48 +185,30 @@ namespace DungeonDash
             for (int x = bounds.xMin; x < bounds.xMax; x++)
                 yield return new Vector2Int(x, y);
         }
-
-        static IEnumerable<Vector2Int> SurroundingOffsets()
-        {
-            for (int y = -1; y <= 1; y++)
-            for (int x = -1; x <= 1; x++)
-                if (x != 0 || y != 0) yield return new Vector2Int(x, y);
-        }
     }
 
     public static class DungeonTileSelector
     {
+        static readonly string[] CleanFloorNames = { "floor_1", "floor_2", "floor_3", "floor_5" };
+        static readonly string[] DamagedFloorNames = { "floor_4", "floor_6", "floor_7", "floor_8" };
+
         public static float DamagedFloorChance(float roomAge) =>
             Mathf.Lerp(0.03f, 0.45f, Mathf.Clamp01(roomAge) * Mathf.Clamp01(roomAge));
 
         public static Sprite SelectFloor(Sprite[] floors, float roomAge, System.Random random)
         {
-            var clean = FindByName(floors, "floor_1");
-            var damaged = floors.Where(sprite => sprite.name != "floor_1").ToArray();
-            if (damaged.Length == 0 || random.NextDouble() >= DamagedFloorChance(roomAge)) return clean;
-            return damaged[random.Next(damaged.Length)];
+            bool damaged = random.NextDouble() < DamagedFloorChance(roomAge);
+            var names = damaged ? DamagedFloorNames : CleanFloorNames;
+            var pool = floors.Where(sprite => names.Contains(sprite.name)).ToArray();
+            return pool[random.Next(pool.Length)];
         }
 
         public static Sprite FindByName(IEnumerable<Sprite> sprites, string name) =>
             sprites.First(sprite => sprite.name == name);
 
-        public static string DoorSpriteName(bool isOpen) =>
-            isOpen ? "doors_leaf_open" : "doors_leaf_closed";
+        public static IReadOnlyCollection<string> StructuralWallSpriteNames => WallClassifier.StructuralSpriteNames;
 
-        public static string WallSpriteName(DungeonLayout layout, Vector2Int wall)
-        {
-            bool floorLeft = layout.Walkable.Contains(wall + Vector2Int.left);
-            bool floorRight = layout.Walkable.Contains(wall + Vector2Int.right);
-            bool floorAbove = layout.Walkable.Contains(wall + Vector2Int.up);
-            bool floorBelow = layout.Walkable.Contains(wall + Vector2Int.down);
-
-            if (floorBelow && floorRight) return "wall_top_left";
-            if (floorBelow && floorLeft) return "wall_top_right";
-            if (floorBelow) return "wall_top_mid";
-            if (floorAbove) return "edge_down";
-            if (floorRight) return "wall_left";
-            if (floorLeft) return "wall_right";
-            return "wall_mid";
-        }
+        public static string WallSpriteName(DungeonLayout layout, Vector2Int cell) =>
+            WallClassifier.SpriteName(layout.Walkable.Contains, cell, layout.GridBounds.min);
     }
 }
