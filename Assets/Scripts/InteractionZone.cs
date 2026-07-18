@@ -40,7 +40,8 @@ namespace DungeonDash
 
         void OnGUI()
         {
-            if (!PlayerInRange || Camera.main == null) return;
+            if (_game == null || !_game.WorldRunning || Camera.main == null) return;
+            bool playerInRange = PlayerInRange;
             _promptStyle ??= new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,
@@ -48,14 +49,15 @@ namespace DungeonDash
                 fontStyle = FontStyle.Bold,
                 font = UiTheme.BodyFont
             };
-            _promptStyle.normal.textColor = new Color(0.85f, 0.92f, 1f);
+            _promptStyle.normal.textColor = UiTheme.Cream;
 
             Vector3 screen = Camera.main.WorldToScreenPoint(transform.position + Vector3.up * 0.9f);
             if (screen.z < 0f) return;
-            var rect = new Rect(screen.x - 70f, Screen.height - screen.y - 22f, 140f, 26f);
-            UiTheme.DrawRect(rect, new Color(0.055f, 0.065f, 0.085f, 0.94f));
-            UiTheme.DrawBorder(rect, UiTheme.AccentGold, 2f);
-            GUI.Label(rect, $"[E] {_label}", _promptStyle);
+            var rect = new Rect(screen.x - 80f, Screen.height - screen.y - 22f, 160f, 26f);
+            UiTheme.DrawRect(rect, new Color(0.055f, 0.065f, 0.085f, playerInRange ? 0.94f : 0.78f));
+            UiTheme.DrawBorder(rect, playerInRange ? UiTheme.AccentGold : UiTheme.SubPanelBorder,
+                playerInRange ? 2f : 1f);
+            GUI.Label(rect, playerInRange ? $"[E] {_label}" : _label, _promptStyle);
         }
     }
 }

@@ -8,6 +8,26 @@ namespace DungeonDashTests
 {
     public sealed class InventoryPauseTests
     {
+        [Test]
+        public void VolumeSetting_PersistsAndAutomatedRunsStayMuted()
+        {
+            int previous = GameAudio.SavedVolumeStep;
+            try
+            {
+                GameAudio.SetVolumeStep(2);
+                Assert.That(GameAudio.SavedVolumeStep, Is.EqualTo(2));
+                Assert.That(AudioListener.volume,
+                    Is.EqualTo(GameAudio.MutedForAutomation ? 0f : 0.5f).Within(0.001f));
+
+                GameAudio.SetVolumeStep(99);
+                Assert.That(GameAudio.SavedVolumeStep, Is.EqualTo(GameAudio.MaxVolumeStep));
+            }
+            finally
+            {
+                GameAudio.SetVolumeStep(previous);
+            }
+        }
+
         [UnityTest]
         public IEnumerator Inventory_PausesAndRestoresThePreviousTimeScale()
         {

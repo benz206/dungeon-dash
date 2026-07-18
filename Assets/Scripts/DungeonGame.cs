@@ -45,7 +45,7 @@ namespace DungeonDash
         SpriteRenderer _exitDoorLeaf;
         BoxCollider2D _exitDoorBlocker;
         bool _roomExitUnlocked;
-        bool _audioMuted;
+        int _volumeStep;
         GameCatalog.CharacterSkin _selectedCharacter;
         Artifact _selectedArtifact;
         Vector2 _inventoryScroll;
@@ -107,6 +107,8 @@ namespace DungeonDash
             _onlineMarket = new UgsMarketService();
             SeedMarket();
             ConfigureCamera();
+            _volumeStep = GameAudio.MutedForAutomation ? 0 : GameAudio.SavedVolumeStep;
+            GameAudio.ApplySavedVolume();
             // The world (hub or dungeon) is built once a character slot is chosen — nothing on boot.
         }
 
@@ -114,6 +116,7 @@ namespace DungeonDash
         {
             const string captureArgument = "--qa-screenshot=";
             const string characterArgument = "--qa-character=";
+            const string viewArgument = "--qa-view=";
             string[] arguments = Environment.GetCommandLineArgs();
             string character = arguments
                 .FirstOrDefault(x => x.StartsWith(characterArgument, StringComparison.Ordinal));
@@ -122,6 +125,33 @@ namespace DungeonDash
                 string id = character.Substring(characterArgument.Length);
                 var skin = _catalog.characters.FirstOrDefault(x => x.id == id);
                 if (skin != null) StartRun(skin);
+            }
+            string view = arguments
+                .FirstOrDefault(x => x.StartsWith(viewArgument, StringComparison.Ordinal))?
+                .Substring(viewArgument.Length);
+            if (view == "slots")
+            {
+                _creatingSlot = false;
+                _mode = GameMode.CharacterSelect;
+            }
+            else if (view == "picker")
+            {
+                _creatingSlot = true;
+                _selectedCharacter = null;
+                _mode = GameMode.CharacterSelect;
+            }
+            else if (view == "hub" && _activeSlot != null)
+            {
+                BuildHub();
+            }
+            else if (view == "game-over" && WorldRunning)
+            {
+                GameOver();
+            }
+            else if ((view == "door" || view == "transition" || view == "next-room") && CombatActive)
+            {
+                PrepareDoorQa();
+                if (view != "door") BeginNextRoomTransition();
             }
             if (arguments.Contains("--qa-inventory") && WorldRunning)
             {
@@ -142,16 +172,40 @@ namespace DungeonDash
             if (argument != null)
             {
                 Application.runInBackground = true;
-                StartCoroutine(CaptureQaFrame(argument.Substring(captureArgument.Length)));
+                float delay = view == "door" ? 1.1f : 0.25f;
+                StartCoroutine(CaptureQaFrame(argument.Substring(captureArgument.Length), view, delay));
             }
         }
 
-        static IEnumerator CaptureQaFrame(string path)
+        void PrepareDoorQa()
         {
-            yield return new WaitForSecondsRealtime(0.25f);
+            foreach (var enemy in _enemies.ToArray())
+                if (enemy != null) enemy.TakeDamage(9999);
+            if (_player == null || _exitDoorZone == null) return;
+            _player.transform.position = _exitDoorZone.transform.position + Vector3.down * 0.75f;
+            Camera.main?.GetComponent<PlayerCenteredCamera>()?.CenterNow();
+        }
+
+        IEnumerator CaptureQaFrame(string path, string view, float delay)
+        {
+            if (view == "transition")
+            {
+                while (_transitioning && _transitionAmount < 0.74f) yield return null;
+            }
+            else if (view == "next-room")
+            {
+                while (_transitioning) yield return null;
+                yield return new WaitForSecondsRealtime(delay);
+            }
+            else
+            {
+                yield return new WaitForSecondsRealtime(delay);
+            }
             yield return new WaitForEndOfFrame();
             ScreenCapture.CaptureScreenshot(path);
             Debug.Log($"[DungeonDash] QA screenshot: {path}");
+            yield return new WaitForSecondsRealtime(0.5f);
+            Application.Quit();
         }
 
         void Update()
@@ -605,8 +659,8 @@ namespace DungeonDash
 
             var root = new GameObject("Hub").transform;
             _walkable.Clear();
-            const int halfWidth = 8;
-            const int halfHeight = 5;
+            const int halfWidth = 12;
+            const int halfHeight = 7;
             var floorSprite = _catalog.floors[0];
             for (int x = -halfWidth; x <= halfWidth; x++)
             for (int y = -halfHeight; y <= halfHeight; y++)
@@ -634,14 +688,14 @@ namespace DungeonDash
                 }
             }
 
-            CreateHubZone(root, "MARKET", new Vector2(-4f, 2f), OpenMarketFromHub);
-            CreateHubZone(root, "DUNGEON", new Vector2(4f, 2f), BeginDungeonTransition);
+            CreateHubZone(root, "MARKET", new Vector2(-5f, 3f), OpenMarketFromHub);
+            CreateHubDungeonDoor(root, new Vector2(5f, halfHeight - 2f));
 
-            SpawnPlayer(ActiveSkin, new Vector2(0f, -1f));
+            SpawnPlayer(ActiveSkin, Vector2.zero);
             _wave = 0;
             _kills = 0;
             _mode = GameMode.HomeHub;
-            Toast("Home — stand on a portal and press E");
+            Toast("Home — approach a destination and press E");
         }
 
         void CreateHubZone(Transform parent, string label, Vector2 position, System.Action onInteract)
@@ -649,6 +703,24 @@ namespace DungeonDash
             var marker = CreateSprite($"Zone {label}", _catalog.chests.Length > 0 ? _catalog.chests[0] : null, position, 6, parent);
             marker.transform.localScale = Vector3.one * 1.1f;
             marker.AddComponent<InteractionZone>().Setup(this, label, onInteract);
+        }
+
+        void CreateHubDungeonDoor(Transform parent, Vector2 center)
+        {
+            var frameLeft = DungeonTileSelector.FindByName(_catalog.walls, "doors_frame_left");
+            var frameTop = DungeonTileSelector.FindByName(_catalog.walls, "doors_frame_top");
+            var frameRight = DungeonTileSelector.FindByName(_catalog.walls, "doors_frame_right");
+            var closed = DungeonTileSelector.FindByName(_catalog.walls, "doors_leaf_closed");
+            int order = YSort.Order(center.y - 1f, 0);
+            CreateSprite("Hub Door Frame Left", frameLeft, center + Vector2.left * 1.5f, order, parent);
+            CreateSprite("Hub Door Frame Top", frameTop, center + Vector2.up * 1.5f, order, parent);
+            CreateSprite("Hub Door Frame Right", frameRight, center + Vector2.right * 1.5f, order, parent);
+            CreateSprite("Hub Door Leaf", closed, center, order + 1, parent);
+
+            var interaction = new GameObject("Zone DUNGEON");
+            interaction.transform.position = center + Vector2.down * 1.7f;
+            interaction.transform.SetParent(parent);
+            interaction.AddComponent<InteractionZone>().Setup(this, "DUNGEON", BeginDungeonTransition);
         }
 
         void OpenMarketFromHub()
@@ -751,7 +823,7 @@ namespace DungeonDash
             float elapsed = 0f;
             while (elapsed < duration)
             {
-                elapsed += Mathf.Max(Time.unscaledDeltaTime, 1f / 120f);
+                elapsed += Mathf.Clamp(Time.unscaledDeltaTime, 1f / 120f, 1f / 30f);
                 float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
                 _transitionAmount = Mathf.Lerp(from, to, t);
                 yield return null;
@@ -1178,12 +1250,22 @@ namespace DungeonDash
             }
             if (Button(new Rect(rect.center.x - buttonWidth / 2f, buttonY, buttonWidth, 66), "RESUME", _buttonStyle))
                 SetPauseOpen(false);
-            if (Button(new Rect(rect.xMax - 38 - buttonWidth, buttonY, buttonWidth, 66),
-                _audioMuted ? "SOUND OFF" : "SOUND ON", _buttonStyle))
-            {
-                _audioMuted = !_audioMuted;
-                AudioListener.volume = _audioMuted ? 0f : 1f;
-            }
+
+            var volumeRect = new Rect(rect.xMax - 38 - buttonWidth, buttonY, buttonWidth, 66);
+            SubPanel(volumeRect);
+            if (Button(new Rect(volumeRect.x + 4, volumeRect.y + 8, 42, 50), "-", _buttonStyle))
+                ChangeVolume(-1);
+            GUI.Label(new Rect(volumeRect.x + 48, volumeRect.y + 6, 80, 22), "VOLUME", _centerStyle);
+            GUI.Label(new Rect(volumeRect.x + 48, volumeRect.y + 27, 80, 28),
+                $"{_volumeStep * 25}%", _hudTitleStyle);
+            if (Button(new Rect(volumeRect.xMax - 46, volumeRect.y + 8, 42, 50), "+", _buttonStyle))
+                ChangeVolume(1);
+        }
+
+        void ChangeVolume(int direction)
+        {
+            _volumeStep = Mathf.Clamp(_volumeStep + direction, 0, GameAudio.MaxVolumeStep);
+            GameAudio.SetVolumeStep(_volumeStep);
         }
 
         void DrawSceneTransition()
@@ -1332,7 +1414,7 @@ namespace DungeonDash
             Panel(rect);
             DrawRect(new Rect(rect.x, rect.y, rect.width, 7), AccentRed);
             GUI.Label(new Rect(rect.x + 34, rect.y + 22, 480, 42), "NEW DELVER", _titleStyle);
-            GUI.Label(new Rect(rect.x + 520, rect.y + 29, rect.width - 654, 28), "REGISTRY  /  CHOOSE YOUR OPERATIVE", _rightStyle);
+            GUI.Label(new Rect(rect.x + 520, rect.y + 29, rect.width - 690, 28), "REGISTRY  /  CHOOSE YOUR OPERATIVE", _rightStyle);
             if (Button(new Rect(rect.xMax - 150, rect.y + 22, 118, 38), "CANCEL", _buttonStyle))
                 _creatingSlot = false;
 

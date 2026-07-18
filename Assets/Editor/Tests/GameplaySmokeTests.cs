@@ -43,6 +43,38 @@ namespace DungeonDashTests
         }
 
         [UnityTest]
+        public IEnumerator HomeHub_RendersADungeonDoorAndTransitionsIntoAChunk()
+        {
+            yield return new EnterPlayMode();
+
+            var game = Object.FindFirstObjectByType<DungeonGame>();
+            var catalog = Resources.Load<GameCatalog>("GameCatalog");
+            game.SendMessage("StartRun", catalog.characters[0]);
+            game.SendMessage("Restart");
+            yield return null;
+
+            var hub = GameObject.Find("Hub");
+            Assert.That(hub, Is.Not.Null);
+            Assert.That(GameObject.Find("Hub Door Frame Left"), Is.Not.Null);
+            Assert.That(GameObject.Find("Hub Door Frame Top"), Is.Not.Null);
+            Assert.That(GameObject.Find("Hub Door Frame Right"), Is.Not.Null);
+            Assert.That(GameObject.Find("Hub Door Leaf").GetComponent<SpriteRenderer>().sprite.name,
+                Is.EqualTo("doors_leaf_closed"));
+            Assert.That(GameObject.Find("Zone DUNGEON").GetComponent<InteractionZone>(), Is.Not.Null);
+
+            game.SendMessage("BeginDungeonTransition");
+            Assert.That(game.TransitionActive, Is.True);
+            for (int frame = 0; frame < 180 && game.TransitionActive; frame++) yield return null;
+
+            Assert.That(game.TransitionActive, Is.False, "hub-to-dungeon transition did not finish");
+            Assert.That(GameObject.Find("Hub"), Is.Null);
+            Assert.That(GameObject.Find("Arena"), Is.Not.Null);
+            Assert.That(game.CurrentRoom, Is.EqualTo(1));
+
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
         public IEnumerator Combat_KillingAnEnemyAdvancesTheRun()
         {
             yield return new EnterPlayMode();

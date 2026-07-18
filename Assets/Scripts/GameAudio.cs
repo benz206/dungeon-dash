@@ -13,6 +13,14 @@ namespace DungeonDash
         const float CoalesceWindow = 0.03f;
         const float AmbienceVolume = 0.25f;
         const float MasterVolume = 1f;
+        const string VolumePreferenceKey = "DungeonDash.AudioVolume";
+
+        public const int MaxVolumeStep = 4;
+        public static bool MutedForAutomation { get; } = Application.isBatchMode ||
+            System.Array.Exists(System.Environment.GetCommandLineArgs(), argument =>
+                argument.StartsWith("--qa-", System.StringComparison.Ordinal));
+        public static int SavedVolumeStep =>
+            Mathf.Clamp(PlayerPrefs.GetInt(VolumePreferenceKey, MaxVolumeStep), 0, MaxVolumeStep);
 
         static readonly string[] ClipIds =
         {
@@ -39,7 +47,12 @@ namespace DungeonDash
         void Awake()
         {
             _instance = this;
-            if (Application.isBatchMode) return;
+            ApplySavedVolume();
+            if (MutedForAutomation)
+            {
+                Debug.Log("[DungeonDash] Automated audio muted.");
+                return;
+            }
 
             foreach (var id in ClipIds)
             {
@@ -71,8 +84,20 @@ namespace DungeonDash
 
         public static void Play(string id, float volume = 1f)
         {
-            if (_instance == null || Application.isBatchMode) return;
+            if (_instance == null || MutedForAutomation) return;
             _instance.PlayInternal(id, volume);
+        }
+
+        public static void SetVolumeStep(int step)
+        {
+            PlayerPrefs.SetInt(VolumePreferenceKey, Mathf.Clamp(step, 0, MaxVolumeStep));
+            PlayerPrefs.Save();
+            ApplySavedVolume();
+        }
+
+        public static void ApplySavedVolume()
+        {
+            AudioListener.volume = MutedForAutomation ? 0f : SavedVolumeStep / (float)MaxVolumeStep;
         }
 
         void PlayInternal(string id, float volume)
