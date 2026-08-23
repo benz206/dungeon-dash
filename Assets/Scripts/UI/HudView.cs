@@ -29,7 +29,7 @@ namespace DungeonDash
         int _lastHealth = -1;
         int _lastChamber = -1;
         int _lastKills = -1;
-        string _lastWeaponId;
+        string _lastEquippedId;
 
         public void Initialize(DungeonGame game)
         {
@@ -68,7 +68,7 @@ namespace DungeonDash
             var coinIcon = UiKit.Icon("Coin", panel.transform, null);
             UiKit.Place(coinIcon.rectTransform, 92f, 46f, 20f, 20f);
             var coinSprites = _game.Catalog.Catalog.coins;
-            if (coinSprites.Length > 0) coinIcon.sprite = coinSprites[0];
+            UiKit.SetIcon(coinIcon, coinSprites.Length > 0 ? coinSprites[0] : null);
             _coins = UiKit.Label("Coins", panel.transform, "0", 19, UiPalette.Gold);
             UiKit.Place(_coins.rectTransform, 118f, 44f, 80f, 24f);
 
@@ -129,8 +129,8 @@ namespace DungeonDash
         public void Refresh()
         {
             var skin = _game.ActiveSkin;
-            if (skin != null && skin.idle.Length > 0) _portrait.sprite = skin.idle[0];
-            _lastWeaponId = null;
+            UiKit.SetIcon(_portrait, skin != null && skin.idle.Length > 0 ? skin.idle[0] : null);
+            _lastEquippedId = null;
             _lastCoins = -1;
             _lastHealth = -1;
             _lastChamber = -1;
@@ -154,12 +154,11 @@ namespace DungeonDash
             }
 
             var equipped = _game.EquippedArtifact;
-            string weaponId = equipped?.id;
-            if (weaponId != _lastWeaponId)
+            string equippedId = equipped?.id;
+            if (equippedId != _lastEquippedId)
             {
-                _lastWeaponId = weaponId;
-                _weaponIcon.sprite = equipped == null ? null : _game.Catalog.Weapon(equipped.weaponId);
-                _weaponIcon.enabled = _weaponIcon.sprite != null;
+                _lastEquippedId = equippedId;
+                UiKit.SetIcon(_weaponIcon, equipped == null ? null : _game.Catalog.Weapon(equipped.weaponId));
                 _weaponName.text = equipped == null ? "UNARMED" : equipped.displayName;
                 _weaponStats.text = equipped == null ? string.Empty : equipped.Stats;
                 _weaponName.color = equipped == null ? UiPalette.Muted : UiPalette.Rarity(equipped.rarity);
@@ -194,13 +193,15 @@ namespace DungeonDash
             int slots = Mathf.Min(MaxHeartIcons, Mathf.Max(0, player.MaxHealth / 2));
             for (int i = 0; i < _hearts.Count; i++)
             {
-                bool used = i < slots;
-                _hearts[i].enabled = used;
-                if (!used) continue;
+                if (i >= slots)
+                {
+                    UiKit.SetIcon(_hearts[i], null);
+                    continue;
+                }
                 int health = player.Health - i * 2;
-                _hearts[i].sprite = health >= 2 ? catalog.heartFull
+                UiKit.SetIcon(_hearts[i], health >= 2 ? catalog.heartFull
                     : health == 1 ? catalog.heartHalf
-                    : catalog.heartEmpty;
+                    : catalog.heartEmpty);
             }
         }
     }

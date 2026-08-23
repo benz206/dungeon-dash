@@ -61,8 +61,9 @@ namespace DungeonDash
                               y == -HubHalfHeight || y == HubHalfHeight;
                 if (border)
                 {
-                    var wall = CreateWall(cell, _catalog.Tile(HubWallName(x, y)),
-                        $"Hub Wall {HubWallName(x, y)} {x},{y}", world.Root, Color.white);
+                    string wallName = HubWallName(x, y);
+                    var wall = CreateWall(cell, _catalog.Tile(wallName),
+                        $"Hub Wall {wallName} {x},{y}", world.Root, Color.white);
                     wall.AddComponent<BoxCollider2D>();
                 }
                 else

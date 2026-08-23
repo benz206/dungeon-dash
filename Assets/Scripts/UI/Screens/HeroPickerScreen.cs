@@ -16,6 +16,15 @@ namespace DungeonDash
         RectTransform _rosterContent;
         RectTransform _detail;
         GameCatalog.CharacterSkin _selected;
+        Image _detailPortrait;
+        Text _detailName;
+        Text _detailRole;
+        Text _healthValue;
+        Text _movementValue;
+        Text _damageValue;
+        UiBar _health;
+        UiBar _movement;
+        UiBar _damage;
 
         protected override void Build()
         {
@@ -83,16 +92,6 @@ namespace DungeonDash
             UiKit.SetContentHeight(_rosterContent, rows * (CardHeight + CardGap));
         }
 
-        Image _detailPortrait;
-        Text _detailName;
-        Text _detailRole;
-        UiBar _health;
-        UiBar _movement;
-        UiBar _damage;
-        Text _healthValue;
-        Text _movementValue;
-        Text _damageValue;
-
         void BuildDetail()
         {
             var panel = UiKit.Inset("Panel", _detail);
@@ -146,7 +145,7 @@ namespace DungeonDash
             for (int i = 0; i < _cardFrames.Count; i++)
                 _cardFrames[i].color = _order[i] == skin ? UiPalette.Gold : Color.clear;
 
-            _detailPortrait.sprite = skin.idle.Length > 0 ? skin.idle[0] : null;
+            UiKit.SetIcon(_detailPortrait, skin.idle.Length > 0 ? skin.idle[0] : null);
             _detailName.text = HeroNames.Name(skin.id).ToUpperInvariant();
             _detailRole.text = $"{HeroNames.Role(skin.id).ToUpperInvariant()}  /  APPEARANCE {HeroNames.Variant(skin.id)}";
 

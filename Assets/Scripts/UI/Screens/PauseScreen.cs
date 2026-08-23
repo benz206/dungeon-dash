@@ -77,7 +77,7 @@ namespace DungeonDash
         public override void Refresh()
         {
             var skin = Game.ActiveSkin;
-            if (skin != null && skin.idle.Length > 0) _portrait.sprite = skin.idle[0];
+            UiKit.SetIcon(_portrait, skin != null && skin.idle.Length > 0 ? skin.idle[0] : null);
             _heroName.text = skin == null ? string.Empty : HeroNames.Name(skin.id).ToUpperInvariant();
             _runLine.text = Game.Mode == GameMode.HomeHub
                 ? "HOME BASE  ·  SAFE ROOM"
@@ -87,9 +87,8 @@ namespace DungeonDash
             var inventory = Game.Inventory;
             for (int i = 0; i < _slotIcons.Count; i++)
             {
-                bool filled = i < inventory.Count;
-                _slotIcons[i].enabled = filled;
-                if (filled) _slotIcons[i].sprite = Game.Catalog.Weapon(inventory[i].weaponId);
+                UiKit.SetIcon(_slotIcons[i],
+                    i < inventory.Count ? Game.Catalog.Weapon(inventory[i].weaponId) : null);
             }
         }
     }

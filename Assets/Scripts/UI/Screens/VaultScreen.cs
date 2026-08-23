@@ -207,7 +207,7 @@ namespace DungeonDash
             _detailRarity.text = artifact.rarity.ToUpperInvariant();
             _detailRarity.color = rarity;
             _detailName.text = artifact.displayName;
-            _detailIcon.sprite = Game.Catalog.Weapon(artifact.weaponId);
+            UiKit.SetIcon(_detailIcon, Game.Catalog.Weapon(artifact.weaponId));
             _detailQuality.text = artifact.quality.ToString();
             _detailValue.text = $"VALUE  {artifact.Price} COINS";
             _qualityBar.SetAmount(artifact.quality / 100f);

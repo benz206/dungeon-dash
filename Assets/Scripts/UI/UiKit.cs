@@ -17,8 +17,7 @@ namespace DungeonDash
             Fill = fill;
         }
 
-        public void SetAmount(float amount) =>
-            Fill.rectTransform.anchorMax = new Vector2(Mathf.Clamp01(amount), 1f);
+        public void SetAmount(float amount) => Fill.fillAmount = Mathf.Clamp01(amount);
     }
 
     public readonly struct UiDialog
@@ -95,8 +94,12 @@ namespace DungeonDash
         public static Image Inset(string name, Transform parent) =>
             Chrome(name, parent, UiSprites.Inset, Color.white);
 
-        public static Image Frame(string name, Transform parent, Color color) =>
-            Chrome(name, parent, UiSprites.Frame, color);
+        public static Image Frame(string name, Transform parent, Color color)
+        {
+            var image = Chrome(name, parent, UiSprites.Frame, color);
+            image.fillCenter = false;
+            return image;
+        }
 
         public static Image Fill(string name, Transform parent, Color color) =>
             Chrome(name, parent, UiSprites.Solid, color);
@@ -106,7 +109,14 @@ namespace DungeonDash
             var image = Chrome(name, parent, sprite, Color.white);
             image.type = Image.Type.Simple;
             image.preserveAspect = true;
+            image.enabled = sprite != null;
             return image;
+        }
+
+        public static void SetIcon(Image image, Sprite sprite)
+        {
+            image.sprite = sprite;
+            image.enabled = sprite != null;
         }
 
         public static Text Label(string name, Transform parent, string text, int size, Color color,
@@ -143,10 +153,12 @@ namespace DungeonDash
         public static UiBar Bar(string name, Transform parent, Color fillColor)
         {
             var track = Chrome(name, parent, UiSprites.Bar, UiPalette.Ink.Alpha(0.85f));
-            var fill = Chrome("Fill", track.transform, UiSprites.Bar, fillColor);
-            Stretch(fill.rectTransform, 2f, 2f, 2f, 2f);
-            fill.rectTransform.anchorMin = new Vector2(0f, 0f);
-            fill.rectTransform.anchorMax = new Vector2(1f, 1f);
+            var fill = Fill("Fill", track.transform, fillColor);
+            Stretch(fill.rectTransform, 3f, 3f, 3f, 3f);
+            fill.type = Image.Type.Filled;
+            fill.fillMethod = Image.FillMethod.Horizontal;
+            fill.fillOrigin = (int)Image.OriginHorizontal.Left;
+            fill.fillAmount = 1f;
             return new UiBar(track.rectTransform, fill);
         }
 

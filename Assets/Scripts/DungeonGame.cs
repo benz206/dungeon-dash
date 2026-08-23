@@ -56,8 +56,10 @@ namespace DungeonDash
         public Artifact EquippedArtifact => _equipped;
         public int VolumeStep => _volumeStep;
 
+        static readonly Artifact[] NoArtifacts = Array.Empty<Artifact>();
+
         public IReadOnlyList<Artifact> Inventory =>
-            _activeSlot != null ? _activeSlot.inventory : Array.Empty<Artifact>();
+            _activeSlot != null ? (IReadOnlyList<Artifact>)_activeSlot.inventory : NoArtifacts;
 
         public GameCatalog.CharacterSkin ActiveSkin =>
             _activeSlot == null ? _catalog.Catalog.characters[0] : _catalog.Character(_activeSlot.characterId);
