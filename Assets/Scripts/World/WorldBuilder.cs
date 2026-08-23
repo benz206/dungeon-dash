@@ -117,8 +117,6 @@ namespace DungeonDash
             }, "Floor");
         }
 
-        // Floors carry no per-cell tint and never need to sort against actors, so the whole layer
-        // is one chunked Tilemap instead of a GameObject and SpriteRenderer per cell.
         void PaintFloor(Transform parent, ICollection<Vector2Int> cells, Color tint,
             Func<Vector2Int, Sprite> spriteFor, string name)
         {

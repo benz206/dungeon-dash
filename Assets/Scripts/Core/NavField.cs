@@ -3,9 +3,6 @@ using UnityEngine;
 
 namespace DungeonDash
 {
-    // One breadth-first flood from the player, shared by every enemy in the room, rebuilt at most
-    // once per interval. Replaces the previous per-enemy BFS, which allocated a queue and a
-    // predecessor map for each navigator on every repath tick.
     public sealed class NavField
     {
         const float RebuildInterval = 0.15f;
@@ -63,8 +60,6 @@ namespace DungeonDash
             }
         }
 
-        // The next world position to walk toward. Once the mover shares the player's cell it
-        // steers at the player directly, so it closes the last sub-tile gap instead of stalling.
         public bool TryWaypoint(Vector2 from, Vector2 target, out Vector2 waypoint)
         {
             waypoint = from;

@@ -265,9 +265,6 @@ namespace DungeonDash
         static Sprite[] Pool(Sprite[] floors, string[] names) =>
             floors.Where(sprite => names.Contains(sprite.name)).ToArray();
 
-        // Wear and variant are picked from a stable per-cell hash rather than the generator's
-        // random stream, so a chamber re-renders identically and floor placement costs no
-        // allocation and no shared state.
         public static Sprite SelectFloor(Sprite[] cleanFloors, Sprite[] damagedFloors, float wear, Vector2Int cell)
         {
             int threshold = Mathf.RoundToInt(DamagedFloorChance(wear) * 1000f);
@@ -287,9 +284,6 @@ namespace DungeonDash
 
         static int Hash(Vector2Int cell, int salt) => Mix(WallClassifier.StableHash(cell, salt));
 
-        // WallClassifier.StableHash is a plain multiply/xor and its low bits track the cell
-        // coordinates, which tiles a visible grid across the floor. Finalize it so the low bits
-        // avalanche before they pick a sprite.
         static int Mix(int hash)
         {
             unchecked

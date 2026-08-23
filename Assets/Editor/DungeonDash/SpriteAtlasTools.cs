@@ -6,12 +6,6 @@ using UnityEngine.U2D;
 
 namespace DungeonDash.EditorTools
 {
-    /// <summary>
-    /// Packs the loose 0x72 PNGs into Sprite Atlas V2 assets. Without them every sprite is its
-    /// own texture, so a chamber's few hundred SpriteRenderers cannot batch and each costs a
-    /// draw call. Run via "Tools/Dungeon Dash" (or as part of Generate Everything).
-    /// Idempotent: re-running rewrites the atlases in place.
-    /// </summary>
     public static class SpriteAtlasTools
     {
         const string AtlasDir = "Assets/Generated/Atlases";

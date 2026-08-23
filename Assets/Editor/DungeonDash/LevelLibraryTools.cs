@@ -5,12 +5,6 @@ using UnityEngine;
 
 namespace DungeonDash.EditorTools
 {
-    /// <summary>
-    /// Authors the default Level Library: chamber themes, room templates and props, stored as
-    /// sub-assets of Assets/Resources/LevelLibrary.asset so ChamberBuilder can load one file at
-    /// runtime. Generate Everything only creates it when missing — use "Rebuild Default Level
-    /// Library" to discard hand-authored edits and start over.
-    /// </summary>
     public static class LevelLibraryTools
     {
         const string LibraryPath = "Assets/Resources/LevelLibrary.asset";

@@ -40,6 +40,8 @@ namespace DungeonDash
         Texture2D _circleTexture;
         Texture2D _ringTexture;
 
+        static DungeonViewportSystem _instance;
+
         public Camera MinimapCamera => _minimapCamera;
         public GameObject Minimap => _minimap;
 
@@ -50,16 +52,29 @@ namespace DungeonDash
                 new GameObject("Dungeon Viewport").AddComponent<DungeonViewportSystem>();
         }
 
+        public static void Track(PlayerController player)
+        {
+            if (_instance == null) return;
+            _instance.Follow(player);
+        }
+
+        void Awake() => _instance = this;
+
+        void OnEnable()
+        {
+            if (_player == null) Follow(FindFirstObjectByType<PlayerController>());
+        }
+
+        void Follow(PlayerController player)
+        {
+            _player = player;
+            if (_cameraFollow != null) _cameraFollow.SetTarget(_player == null ? null : _player.transform);
+        }
+
         void Update()
         {
             EnsureMainCamera();
-
-            var player = FindFirstObjectByType<PlayerController>();
-            if (player != _player)
-            {
-                _player = player;
-                if (_cameraFollow != null) _cameraFollow.SetTarget(_player == null ? null : _player.transform);
-            }
+            if (_player == null) Follow(FindFirstObjectByType<PlayerController>());
 
             EnsureMinimap();
             bool hasPlayer = _player != null;
@@ -170,6 +185,7 @@ namespace DungeonDash
 
         void OnDestroy()
         {
+            if (_instance == this) _instance = null;
             if (_minimapTexture != null) _minimapTexture.Release();
             if (_circleTexture != null) Destroy(_circleTexture);
             if (_ringTexture != null) Destroy(_ringTexture);

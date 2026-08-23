@@ -193,8 +193,6 @@ namespace DungeonDash
             return cells;
         }
 
-        // Pillars sit on a 3-cell lattice inset from the room edge, so the floor around them
-        // always stays connected and the classifier resolves them to freestanding columns.
         static bool IsPillar(RectInt bounds, Vector2Int cell)
         {
             if (cell.x <= bounds.xMin + 1 || cell.x >= bounds.xMax - 2) return false;
@@ -273,9 +271,6 @@ namespace DungeonDash
             layout.ExitDoorPosition = new Vector2(doorX - 0.5f, doorY + 0.5f);
         }
 
-        // PlanDecorations' banner pass is probabilistic and its per-room guarantee only fires on
-        // straight front walls, which a round or notched room may not have. Force one so every
-        // chamber still reads as inhabited.
         static void EnsureBanner(ChamberPlan plan)
         {
             foreach (var decoration in plan.WallDecorations.Values)

@@ -162,7 +162,7 @@ namespace DungeonDash
             _knockbackDirection = away.sqrMagnitude > 0.01f ? away.normalized : -_aim;
             _knockbackUntil = Time.time + 0.14f;
             Health = Mathf.Max(0, Health - amount);
-            FloatingDamageNumbers.Spawn(transform.position, amount, DamageNumberKind.PlayerHurt);
+            DamageNumberLayer.Spawn(transform.position, amount, DamageNumberKind.PlayerHurt);
             GameAudio.Play("player_hurt", 0.8f);
             GameFeel.Shake(0.4f);
             GameFeel.HitStop();

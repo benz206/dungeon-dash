@@ -5,11 +5,6 @@ using UnityEngine;
 
 namespace DungeonDash.EditorTools
 {
-    /// <summary>
-    /// Authoring surface for the Level Library: edit room templates, themes and props, then
-    /// preview the chamber ChamberBuilder produces for a given depth and seed. The validate
-    /// pass sweeps many seeds and reports layouts that would ship broken.
-    /// </summary>
     public sealed class LevelBuilderWindow : EditorWindow
     {
         const string LibraryPath = "Assets/Resources/LevelLibrary.asset";
@@ -280,7 +275,6 @@ namespace DungeonDash.EditorTools
             return plan.Layout.Walls.Contains(cell) ? WallColor : VoidColor;
         }
 
-        // The texture's y axis matches the grid's, so a preview row maps straight to a world row.
         static void Fill(Color32[] pixels, int width, int cellX, int cellY, int scale, Color color)
         {
             var packed = (Color32)color;
