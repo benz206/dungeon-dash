@@ -258,11 +258,16 @@ namespace DungeonDash
         public static float DamagedFloorChance(float roomAge) =>
             Mathf.Lerp(0.03f, 0.45f, Mathf.Clamp01(roomAge) * Mathf.Clamp01(roomAge));
 
-        public static Sprite SelectFloor(Sprite[] floors, float roomAge, System.Random random)
+        public static Sprite[] CleanFloorPool(Sprite[] floors) => Pool(floors, CleanFloorNames);
+
+        public static Sprite[] DamagedFloorPool(Sprite[] floors) => Pool(floors, DamagedFloorNames);
+
+        static Sprite[] Pool(Sprite[] floors, string[] names) =>
+            floors.Where(sprite => names.Contains(sprite.name)).ToArray();
+
+        public static Sprite SelectFloor(Sprite[] cleanFloors, Sprite[] damagedFloors, float roomAge, System.Random random)
         {
-            bool damaged = random.NextDouble() < DamagedFloorChance(roomAge);
-            var names = damaged ? DamagedFloorNames : CleanFloorNames;
-            var pool = floors.Where(sprite => names.Contains(sprite.name)).ToArray();
+            var pool = random.NextDouble() < DamagedFloorChance(roomAge) ? damagedFloors : cleanFloors;
             return pool[random.Next(pool.Length)];
         }
 

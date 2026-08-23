@@ -10,30 +10,40 @@ namespace DungeonDashTests
     public sealed class EnemyNavigatorTests
     {
         [Test]
-        public void GridPathfinder_RoutesAroundBlockedCells()
+        public void NavField_RoutesAroundBlockedCells()
         {
-            var walkable = new HashSet<Vector2Int>
+            var field = new NavField();
+            field.SetWalkable(new HashSet<Vector2Int>
             {
                 new(0, 0), new(0, 1), new(1, 1), new(2, 1), new(2, 0)
-            };
+            });
+            field.Rebuild(new Vector2Int(2, 0));
 
-            bool found = GridPathfinder.TryFindNextStep(walkable, new Vector2Int(0, 0),
-                new Vector2Int(2, 0), out Vector2Int next);
+            bool found = field.TryWaypoint(new Vector2(0f, 0f), new Vector2(2f, 0f), out Vector2 waypoint);
 
             Assert.That(found, Is.True);
-            Assert.That(next, Is.EqualTo(new Vector2Int(0, 1)));
+            Assert.That(waypoint, Is.EqualTo(new Vector2(0f, 1f)));
         }
 
         [Test]
-        public void GridPathfinder_RejectsAnUnreachableTarget()
+        public void NavField_RejectsAnUnreachableTarget()
         {
-            var walkable = new HashSet<Vector2Int>
-            {
-                new(0, 0), new(2, 0)
-            };
+            var field = new NavField();
+            field.SetWalkable(new HashSet<Vector2Int> { new(0, 0), new(2, 0) });
+            field.Rebuild(new Vector2Int(2, 0));
 
-            Assert.That(GridPathfinder.TryFindNextStep(walkable, new Vector2Int(0, 0),
-                new Vector2Int(2, 0), out _), Is.False);
+            Assert.That(field.TryWaypoint(new Vector2(0f, 0f), new Vector2(2f, 0f), out _), Is.False);
+        }
+
+        [Test]
+        public void NavField_SteersStraightAtTheTargetInsideItsOwnCell()
+        {
+            var field = new NavField();
+            field.SetWalkable(new HashSet<Vector2Int> { new(0, 0), new(1, 0) });
+            field.Rebuild(new Vector2Int(1, 0));
+
+            Assert.That(field.TryWaypoint(new Vector2(1.1f, 0.2f), new Vector2(1.4f, 0.3f), out Vector2 waypoint), Is.True);
+            Assert.That(waypoint, Is.EqualTo(new Vector2(1.4f, 0.3f)));
         }
 
         [UnityTest]

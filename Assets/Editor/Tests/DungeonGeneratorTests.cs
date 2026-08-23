@@ -202,9 +202,11 @@ namespace DungeonDashTests
 
         static int CountDamaged(Sprite[] floors, float age, System.Random random)
         {
+            var clean = DungeonTileSelector.CleanFloorPool(floors);
+            var damaged = DungeonTileSelector.DamagedFloorPool(floors);
             int count = 0;
             for (int i = 0; i < 2000; i++)
-                if (DamagedFloorNames.Contains(DungeonTileSelector.SelectFloor(floors, age, random).name)) count++;
+                if (DamagedFloorNames.Contains(DungeonTileSelector.SelectFloor(clean, damaged, age, random).name)) count++;
             return count;
         }
     }

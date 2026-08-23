@@ -60,6 +60,8 @@ namespace DungeonDash.EditorTools
             GenerateTiles();
             GenerateCharacters();
             GenerateGameCatalog();
+            LevelLibraryTools.GenerateLevelLibrary();
+            SpriteAtlasTools.GenerateSpriteAtlases();
             if (!Application.isBatchMode)
                 EditorUtility.DisplayDialog("Dungeon Dash",
                     "Tiles + characters generated. Check the Console for details.", "OK");
