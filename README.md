@@ -8,9 +8,10 @@ listed on a shared market for other players to buy.
 ## Running the game
 
 Open the project in Unity `6000.5.3f1`. If
-`Assets/Resources/GameCatalog.asset` is missing, run
-`Tools > Dungeon Dash > Generate Everything` before starting. Then open
-`Assets/Scenes/SampleScene.unity` and press Play.
+`Assets/Resources/GameCatalog.asset` or `Assets/Resources/LevelLibrary.asset` is
+missing, run `Tools > Dungeon Dash > Generate Everything` before starting. That
+also packs the sprite atlases, without which every tile costs its own draw call.
+Then open `Assets/Scenes/SampleScene.unity` and press Play.
 
 ### Controls
 
@@ -26,6 +27,29 @@ drop from a round-robin pool, so every imported weapon gets a turn instead of
 being left entirely to chance. Their stats are still rolled independently, and
 high-quality rolls are intentionally rare. Enemy families rotate between waves
 in a similar way.
+
+## Chambers and the level builder
+
+Each chamber is assembled at runtime by `ChamberBuilder` from data in
+`Assets/Resources/LevelLibrary.asset`:
+
+- **Room templates** give a role (entry, combat, hall, treasure), a shape
+  (rectangle, cross, ellipse, pillared, notched), a size range, a minimum depth
+  and prop/enemy weights.
+- **Chamber themes** rotate every two chambers and set floor wear, grass biomes,
+  wall and floor tint, an accent colour the HUD picks up, and a weighted prop
+  table.
+- **Props** are placed by rule — open floor, against the north wall, in a corner
+  or at the room's centre — and solid ones are cut out of the navigation grid.
+
+Rooms are linked with two-wide corridors and the room farthest from the entry
+gets the exit doorway, so every chamber is walkable end to end.
+
+`Tools > Dungeon Dash > Level Builder` edits all three asset types in place,
+previews the chamber a given depth and seed produces, and sweeps 200 seeds
+looking for disconnected floor, a sealed doorway, wall/floor overlap or a
+chamber with nowhere to spawn enemies. `Rebuild Default Level Library` discards
+hand-authored edits and regenerates the defaults.
 
 ## Artifact market
 
@@ -70,8 +94,9 @@ production.
 ## Tests
 
 The Unity edit-mode tests cover hero startup, combat, sprite catalog coverage,
-artifact bounds and rarity, local market persistence, UGS fallback, and client
-retry behavior. The Node tests cover the Cloud Code side, including validation,
+chamber generation (connectivity, doorways, prop and spawn placement,
+determinism), enemy navigation, artifact bounds and rarity, local market
+persistence, UGS fallback, and client retry behavior. The Node tests cover the Cloud Code side, including validation,
 balances, ownership, purchase races, write-lock retries, and idempotency.
 
 Run the Cloud Code tests with:
