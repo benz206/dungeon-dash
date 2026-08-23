@@ -153,6 +153,13 @@ namespace DungeonDash
             tilemap.SetTilesBlock(new BoundsInt(minX, minY, 0, width, height, 1), block);
         }
 
+        public void ReleaseTiles()
+        {
+            foreach (var tile in _tiles.Values)
+                if (tile != null) UnityEngine.Object.Destroy(tile);
+            _tiles.Clear();
+        }
+
         Tile TileFor(Sprite sprite)
         {
             if (sprite == null) return null;

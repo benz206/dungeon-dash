@@ -281,7 +281,7 @@ namespace DungeonDash
             Center(holder, width, height);
 
             var shadow = Fill("Shadow", holder, UiPalette.Ink.Alpha(0.5f));
-            Stretch(shadow.rectTransform, -10f, -14f, -10f, -6f);
+            Stretch(shadow.rectTransform, 9f, 11f, -9f, -11f);
 
             var panel = Panel("Frame", holder);
             Stretch(panel.rectTransform, 0f, 0f, 0f, 0f);

@@ -713,6 +713,8 @@ namespace DungeonDash
 
         void OnDisable() => ReleaseOverlayPause();
 
+        void OnDestroy() => _worldBuilder?.ReleaseTiles();
+
         void OnApplicationQuit() => PersistSave();
 
 
