@@ -222,7 +222,7 @@ namespace DungeonDash
         static bool IsRoomFloor(DungeonLayout layout, Vector2Int cell) =>
             layout.Rooms.Any(room => room.Bounds.Contains(cell));
 
-        static RectInt BoundsAround(IEnumerable<Vector2Int> cells, int padding)
+        internal static RectInt BoundsAround(IEnumerable<Vector2Int> cells, int padding)
         {
             int xMin = cells.Min(cell => cell.x) - padding;
             int xMax = cells.Max(cell => cell.x) + padding;
@@ -231,7 +231,7 @@ namespace DungeonDash
             return new RectInt(xMin, yMin, xMax - xMin + 1, yMax - yMin + 1);
         }
 
-        static void BuildBoundaryWalls(DungeonLayout layout, int depth)
+        internal static void BuildBoundaryWalls(DungeonLayout layout, int depth)
         {
             foreach (var floor in layout.Walkable)
             for (int y = -depth; y <= depth; y++)
@@ -265,10 +265,14 @@ namespace DungeonDash
         static Sprite[] Pool(Sprite[] floors, string[] names) =>
             floors.Where(sprite => names.Contains(sprite.name)).ToArray();
 
-        public static Sprite SelectFloor(Sprite[] cleanFloors, Sprite[] damagedFloors, float roomAge, System.Random random)
+        // Wear and variant are picked from a stable per-cell hash rather than the generator's
+        // random stream, so a chamber re-renders identically and floor placement costs no
+        // allocation and no shared state.
+        public static Sprite SelectFloor(Sprite[] cleanFloors, Sprite[] damagedFloors, float wear, Vector2Int cell)
         {
-            var pool = random.NextDouble() < DamagedFloorChance(roomAge) ? damagedFloors : cleanFloors;
-            return pool[random.Next(pool.Length)];
+            int threshold = Mathf.RoundToInt(DamagedFloorChance(wear) * 1000f);
+            var pool = Hash(cell, 211) % 1000 < threshold ? damagedFloors : cleanFloors;
+            return pool[Hash(cell, 223) % pool.Length];
         }
 
         // Path and grass tiles are chosen by a stable per-cell hash so a given layout renders
@@ -279,17 +283,24 @@ namespace DungeonDash
         public static Sprite SelectGrass(Sprite[] grass, Vector2Int cell) =>
             grass[StableHash(cell) % grass.Length];
 
-        // Roughly one room in four is a grass biome, keyed on a stable hash of its center.
-        public static bool IsGrassRoom(DungeonRoom room) => StableHash(room.Center) % 4 == 0;
+        static int StableHash(Vector2Int cell) => Hash(cell, 17);
 
-        static int StableHash(Vector2Int cell)
+        static int Hash(Vector2Int cell, int salt) => Mix(WallClassifier.StableHash(cell, salt));
+
+        // WallClassifier.StableHash is a plain multiply/xor and its low bits track the cell
+        // coordinates, which tiles a visible grid across the floor. Finalize it so the low bits
+        // avalanche before they pick a sprite.
+        static int Mix(int hash)
         {
             unchecked
             {
-                int h = 17;
-                h = h * 31 + cell.x;
-                h = h * 31 + cell.y;
-                return h & 0x7fffffff;
+                uint value = (uint)hash;
+                value ^= value >> 16;
+                value *= 0x7feb352du;
+                value ^= value >> 15;
+                value *= 0x846ca68bu;
+                value ^= value >> 16;
+                return (int)(value & 0x7FFFFFFF);
             }
         }
 

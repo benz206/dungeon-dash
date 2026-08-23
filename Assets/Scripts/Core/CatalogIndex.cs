@@ -45,12 +45,7 @@ namespace DungeonDash
         public GameCatalog.EnemySkin Enemy(string id) =>
             id != null && _enemies.TryGetValue(id, out var skin) ? skin : null;
 
-        public Sprite Floor(float roomAge, System.Random random)
-        {
-            var pool = random.NextDouble() < DungeonTileSelector.DamagedFloorChance(roomAge)
-                ? DamagedFloors
-                : CleanFloors;
-            return pool[random.Next(pool.Length)];
-        }
+        public Sprite Floor(float wear, Vector2Int cell) =>
+            DungeonTileSelector.SelectFloor(CleanFloors, DamagedFloors, wear, cell);
     }
 }

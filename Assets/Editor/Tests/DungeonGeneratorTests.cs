@@ -161,8 +161,8 @@ namespace DungeonDashTests
         public void FloorWear_IsRareInFreshRoomsAndIncreasesWithAge()
         {
             var catalog = AssetDatabase.LoadAssetAtPath<GameCatalog>("Assets/Resources/GameCatalog.asset");
-            int freshDamaged = CountDamaged(catalog.floors, 0f, new System.Random(3));
-            int oldDamaged = CountDamaged(catalog.floors, 1f, new System.Random(3));
+            int freshDamaged = CountDamaged(catalog.floors, 0f);
+            int oldDamaged = CountDamaged(catalog.floors, 1f);
 
             Assert.That(freshDamaged, Is.LessThan(100));
             Assert.That(oldDamaged, Is.GreaterThan(700));
@@ -200,13 +200,17 @@ namespace DungeonDashTests
 
         static readonly HashSet<string> DamagedFloorNames = new() { "floor_4", "floor_6", "floor_7", "floor_8" };
 
-        static int CountDamaged(Sprite[] floors, float age, System.Random random)
+        static int CountDamaged(Sprite[] floors, float wear)
         {
             var clean = DungeonTileSelector.CleanFloorPool(floors);
             var damaged = DungeonTileSelector.DamagedFloorPool(floors);
             int count = 0;
             for (int i = 0; i < 2000; i++)
-                if (DamagedFloorNames.Contains(DungeonTileSelector.SelectFloor(clean, damaged, age, random).name)) count++;
+            {
+                var cell = new Vector2Int(i % 50, i / 50);
+                if (DamagedFloorNames.Contains(
+                        DungeonTileSelector.SelectFloor(clean, damaged, wear, cell).name)) count++;
+            }
             return count;
         }
     }
