@@ -125,3 +125,77 @@ test("write-lock conflict reloads and an idempotent retry charges once", async (
   assert.equal(stored.players.seller.pendingCoins, 25);
   assert.equal(stored.listings.length, 0);
 });
+
+test("deletion removes market records, preserves other players, and blocks stale mutations", () => {
+  const state = market.emptyState();
+  for (const id of ["seller", "buyer"])
+    market.applyAction(state, id, params("connect", { initialBalance: 100 }));
+  const sold = artifact();
+  const remaining = artifact("11111111111111111111111111111111");
+  market.applyAction(state, "seller", params("list", { artifact: sold, price: 25 }));
+  market.applyAction(state, "buyer", params("buy", { listingId: state.listings[0].id }));
+  market.applyAction(state, "seller", params("list", { artifact: remaining, price: 30 }));
+  state.requests.push({ playerId: "seller", requestId: "old" }, { playerId: "buyer", requestId: "keep" });
+
+  const result = market.applyAction(state, "seller", params("deleteAccountData"), 1000);
+  assert.equal(result.accountDataDeleted, true);
+  assert.equal(state.players.seller, undefined);
+  assert.equal(state.listings.length, 0);
+  assert.equal(state.owners[remaining.id], undefined);
+  assert.equal(state.owners[sold.id], "buyer");
+  assert.equal(state.players.buyer.balance, 75);
+  assert.deepEqual(state.requests, [{ playerId: "buyer", requestId: "keep" }]);
+  for (const action of ["connect", "syncCoins", "list", "claim"])
+    assert.throws(() => market.applyAction(state, "seller", params(action), 1001), /being deleted/);
+  assert.equal(state.players.seller, undefined);
+  market.applyAction(state, "seller", params("deleteAccountData"), 1002);
+  assert.equal(state.players.seller, undefined);
+});
+
+test("deletion wins a write-lock race without erasing an artifact already bought by someone else", async () => {
+  let stored = market.emptyState();
+  for (const id of ["seller", "buyer"])
+    market.applyAction(stored, id, params("connect", { initialBalance: 100 }));
+  market.applyAction(stored, "seller", params("list", { artifact: artifact(), price: 25 }));
+  let raced = false;
+  const api = {
+    async getPrivateCustomItems() {
+      return { data: { results: [{ value: structuredClone(stored), writeLock: raced ? "new" : "old" }] } };
+    },
+    async setPrivateCustomItem(projectId, marketId, body) {
+      if (!raced) {
+        market.applyAction(stored, "buyer", params("buy", { listingId: stored.listings[0].id }));
+        raced = true;
+        throw { response: { status: 409 }, message: "conflict" };
+      }
+      stored = structuredClone(body.value);
+    },
+  };
+  const args = { params: params("deleteAccountData"),
+    context: { projectId: "project", playerId: "seller" }, logger: { error() {} } };
+  assert.equal((await market.runMarket(args, api)).accountDataDeleted, true);
+  assert.equal((await market.runMarket(args, api)).accountDataDeleted, true);
+  assert.equal(stored.players.seller, undefined);
+  assert.equal(stored.players.buyer.balance, 75);
+  assert.equal(stored.owners[artifact().id], "buyer");
+  assert.equal(stored.requests.some(x => x.playerId === "seller"), false);
+});
+
+test("a purchase after deletion fails without charging, and expired barriers are pruned on writes", async () => {
+  let stored = market.emptyState();
+  for (const id of ["seller", "buyer"])
+    market.applyAction(stored, id, params("connect", { initialBalance: 100 }));
+  market.applyAction(stored, "seller", params("list", { artifact: artifact(), price: 25 }));
+  const listingId = stored.listings[0].id;
+  market.applyAction(stored, "seller", params("deleteAccountData"));
+  assert.throws(() => market.applyAction(stored, "buyer", params("buy", { listingId })), /no longer available/);
+  assert.equal(stored.players.buyer.balance, 100);
+  stored.deletions.expiredPlayer = Date.now() - 1;
+  const api = {
+    async getPrivateCustomItems() { return { data: { results: [{ value: structuredClone(stored), writeLock: "one" }] } }; },
+    async setPrivateCustomItem(projectId, marketId, body) { stored = structuredClone(body.value); },
+  };
+  await market.runMarket({ params: params("claim"), context: { projectId: "project", playerId: "buyer" }, logger: { error() {} } }, api);
+  assert.equal(stored.deletions.expiredPlayer, undefined);
+  assert.ok(stored.deletions.seller > Date.now());
+});

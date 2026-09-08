@@ -3,6 +3,9 @@ const STATE_KEY = "state";
 const MAX_LISTINGS = 200;
 const MAX_REQUESTS = 400;
 const MAX_RETRIES = 5;
+// Authentication access tokens last one hour. Keep a replay barrier longer
+// than that so an already-running request cannot recreate a deleted account.
+const DELETION_BARRIER_MS = 2 * 60 * 60 * 1000;
 
 const WEAPONS = new Set([
   "weapon_anime_sword", "weapon_arrow", "weapon_axe", "weapon_baton_with_spikes",
@@ -28,7 +31,7 @@ module.exports.params = {
 };
 
 function emptyState() {
-  return { version: 1, listings: [], players: {}, owners: {}, requests: [] };
+  return { version: 1, listings: [], players: {}, owners: {}, requests: [], deletions: {} };
 }
 
 function normalizeState(value) {
@@ -38,6 +41,7 @@ function normalizeState(value) {
   state.players = state.players && typeof state.players === "object" ? state.players : {};
   state.owners = state.owners && typeof state.owners === "object" ? state.owners : {};
   state.requests = Array.isArray(state.requests) ? state.requests : [];
+  state.deletions = state.deletions && typeof state.deletions === "object" ? state.deletions : {};
   return state;
 }
 
@@ -99,11 +103,22 @@ function publicView(state, playerId, result) {
     pendingCoins: account.pendingCoins,
     artifact: result && result.artifact ? result.artifact : null,
     message: result && result.message ? result.message : "",
+    accountDataDeleted: !!(result && result.accountDataDeleted),
   };
 }
 
-function applyAction(state, playerId, params) {
+function applyAction(state, playerId, params, now = Date.now()) {
   const action = params.action;
+  if (action === "deleteAccountData") {
+    state.listings = state.listings.filter(x => x.sellerId !== playerId);
+    delete state.players[playerId];
+    for (const [id, owner] of Object.entries(state.owners))
+      if (owner === playerId) delete state.owners[id];
+    state.requests = state.requests.filter(x => x.playerId !== playerId);
+    state.deletions[playerId] = now + DELETION_BARRIER_MS;
+    return { message: "Market data deleted", accountDataDeleted: true };
+  }
+  if (state.deletions[playerId] > now) throw Error("This market account is being deleted.");
   const account = player(state, playerId);
 
   if (action === "connect") {
@@ -199,11 +214,15 @@ async function runMarket({ params, context, logger }, apiOverride) {
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const loaded = await loadState(api, projectId);
-    const prior = loaded.state.requests.find(x => x.playerId === playerId && x.requestId === params.requestId);
+    const now = Date.now();
+    for (const [id, expires] of Object.entries(loaded.state.deletions))
+      if (expires <= now) delete loaded.state.deletions[id];
+    const deleting = params.action === "deleteAccountData";
+    const prior = !deleting && loaded.state.requests.find(x => x.playerId === playerId && x.requestId === params.requestId);
     if (prior) return publicView(loaded.state, playerId, prior.result);
 
-    const result = applyAction(loaded.state, playerId, params);
-    loaded.state.requests.push({ playerId, requestId: params.requestId, result });
+    const result = applyAction(loaded.state, playerId, params, now);
+    if (!deleting) loaded.state.requests.push({ playerId, requestId: params.requestId, result });
     if (loaded.state.requests.length > MAX_REQUESTS)
       loaded.state.requests.splice(0, loaded.state.requests.length - MAX_REQUESTS);
 

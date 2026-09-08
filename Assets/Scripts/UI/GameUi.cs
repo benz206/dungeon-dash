@@ -31,6 +31,8 @@ namespace DungeonDash
         Text _toastLabel;
         CanvasGroup _toastGroup;
         float _toastUntil;
+        RectTransform _credits;
+        RectTransform _marketAccount;
 
         public HudView Hud => _hud;
         public MobileControls TouchControls => _touchControls;
@@ -181,6 +183,8 @@ namespace DungeonDash
 
         public void SetMode(GameMode mode, bool heroPicker)
         {
+            if (_credits != null) Destroy(_credits.gameObject);
+            if (_marketAccount != null) Destroy(_marketAccount.gameObject);
             if (mode is GameMode.GameOver or GameMode.Paused or GameMode.StartScreen or GameMode.CharacterSelect)
             {
                 _toastUntil = 0f;
@@ -212,6 +216,18 @@ namespace DungeonDash
         {
             foreach (var screen in _all) if (screen.Visible) screen.Refresh();
             if (_hud.gameObject.activeSelf) _hud.Refresh();
+        }
+
+        public void ShowCredits()
+        {
+            if (_credits == null) _credits = CreditsPanel.Show(_screenLayer);
+        }
+
+        public void ShowMarketAccount()
+        {
+            if (_marketAccount != null) return;
+            _marketAccount = UiKit.Node("Online Data", _screenLayer);
+            _marketAccount.gameObject.AddComponent<MarketAccountPanel>().Initialize(_game);
         }
 
         public void SetTransition(float amount, string label)

@@ -33,6 +33,13 @@ namespace DungeonDash
                 Game.OpenSlotSelect, 18);
             UiKit.Place(enter.Rect, 20f, 180f, 420f, 66f);
 
+            var credits = UiKit.PushButton("Credits", dialog.Body, "CREDITS", ButtonTone.Ghost,
+                Ui.ShowCredits, 14);
+            UiKit.Place(credits.Rect, 126f, 264f, 200f, 44f);
+            var account = UiKit.PushButton("Online Data", dialog.Body, "ONLINE DATA", ButtonTone.Ghost,
+                Ui.ShowMarketAccount, 14);
+            UiKit.Place(account.Rect, 350f, 264f, 220f, 44f);
+
             if (MobileControls.Enabled)
             {
                 var collection = UiKit.PushButton("Collection", dialog.Body, "STYLES", ButtonTone.Primary,

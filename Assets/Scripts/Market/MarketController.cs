@@ -20,6 +20,7 @@ namespace DungeonDash
         readonly SaveData _save;
         readonly LocalMarketService _local;
         readonly UgsMarketService _online;
+        bool _operationBusy;
 
         public MarketController(IMarketHost host, SaveData save, LocalMarketService local, UgsMarketService online)
         {
@@ -30,8 +31,14 @@ namespace DungeonDash
         }
 
         public bool UsingOnline { get; private set; }
-        public bool Busy => _online.Busy;
-        public string Status => _online.Status;
+        public bool Busy => _operationBusy || _online.Busy;
+        public bool DeletionPending => _save.marketDeletionPending;
+        public bool OnlineEnabled => _save.marketOnlineEnabled || _save.marketAccountInitialized;
+        public bool HasOnlineAccount => OnlineEnabled || DeletionPending || !string.IsNullOrEmpty(_save.marketPlayerId);
+        public string SupportId => _save.marketPlayerId ?? string.Empty;
+        public string Status => DeletionPending
+            ? Busy ? "Deleting online account..." : "Deletion unconfirmed · open ONLINE DATA to retry"
+            : !OnlineEnabled ? "Local market · simulated listings" : _online.Status;
         public int PendingCoins => UsingOnline ? _online.PendingCoins : 0;
 
         public IReadOnlyList<MarketListing> Listings => UsingOnline ? _online.Listings : _local.Listings;
@@ -53,14 +60,14 @@ namespace DungeonDash
 
         public string Serialize() => _local.Serialize();
 
-        public int SimulateSales(System.Random random) => _local.SimulateSales(random);
+        public int SimulateSales(System.Random random) => DeletionPending ? 0 : _local.SimulateSales(random);
 
         public void TrackCoinDelta(int amount)
         {
-            if (_save.marketAccountInitialized) _save.marketPendingCoinDelta += amount;
+            if (_save.marketAccountInitialized && !DeletionPending) _save.marketPendingCoinDelta += amount;
         }
 
-        public async void Open()
+        public void Open() => RunTrade(async () =>
         {
             if (await EnsureOnline())
             {
@@ -80,10 +87,11 @@ namespace DungeonDash
             if (_online.IsOnline) return;
             UsingOnline = false;
             ClaimLocalProceeds();
-        }
+        });
 
         public void ClaimLocalProceeds()
         {
+            if (DeletionPending) return;
             int coins = _local.ClaimProceeds();
             if (coins <= 0) return;
             _host.Coins += coins;
@@ -92,15 +100,14 @@ namespace DungeonDash
             _host.PersistSave();
         }
 
-        public async void List(Artifact artifact)
+        public void List(Artifact artifact) => RunTrade(async () =>
         {
-            if (Busy) return;
             if (!await EnsureOnline())
             {
                 if (_online.IsOnline) return;
                 if (!_host.RemoveArtifact(artifact)) return;
                 _local.List(artifact, artifact.Price);
-                _host.Notify($"Online unavailable — listed {artifact.displayName} locally");
+                _host.Notify($"Listed {artifact.displayName} in the local market");
                 _host.PersistSave();
                 return;
             }
@@ -116,11 +123,10 @@ namespace DungeonDash
             {
                 _host.Notify("Listing failed: " + exception.GetBaseException().Message);
             }
-        }
+        });
 
-        public async void Buy(MarketListing listing)
+        public void Buy(MarketListing listing) => RunTrade(async () =>
         {
-            if (Busy) return;
             if (!UsingOnline)
             {
                 int coins = _host.Coins;
@@ -145,11 +151,10 @@ namespace DungeonDash
             {
                 _host.Notify("Purchase failed: " + exception.GetBaseException().Message);
             }
-        }
+        });
 
-        public async void Cancel(MarketListing listing)
+        public void Cancel(MarketListing listing) => RunTrade(async () =>
         {
-            if (Busy) return;
             if (!UsingOnline)
             {
                 var returned = _local.Cancel(listing.id);
@@ -171,9 +176,9 @@ namespace DungeonDash
             {
                 _host.Notify("Cancel failed: " + exception.GetBaseException().Message);
             }
-        }
+        });
 
-        public async void Refresh()
+        public void Refresh() => RunTrade(async () =>
         {
             try
             {
@@ -185,9 +190,9 @@ namespace DungeonDash
             {
                 _host.Notify("Refresh failed: " + exception.GetBaseException().Message);
             }
-        }
+        });
 
-        public async void Claim()
+        public void Claim() => RunTrade(async () =>
         {
             try
             {
@@ -199,10 +204,51 @@ namespace DungeonDash
             {
                 _host.Notify("Claim failed: " + exception.GetBaseException().Message);
             }
+        });
+
+        async void RunTrade(Func<Task> operation)
+        {
+            if (Busy || DeletionPending) return;
+            _operationBusy = true;
+            try
+            {
+                await operation();
+            }
+            finally
+            {
+                _operationBusy = false;
+            }
+        }
+
+        public void EnableOnline()
+        {
+            if (Busy || DeletionPending) return;
+            _save.marketOnlineEnabled = true;
+            _host.PersistSave();
+            Open();
+        }
+
+        public async Task<bool> DeleteOnlineAccountAsync()
+        {
+            if (Busy) return false;
+            _operationBusy = true;
+            try
+            {
+                bool deleted = await _online.DeleteAccountAsync(_save);
+                UsingOnline = false;
+                _host.PersistSave();
+                _host.Notify(_online.Status);
+                return deleted;
+            }
+            finally
+            {
+                _operationBusy = false;
+            }
         }
 
         async Task<bool> EnsureOnline()
         {
+            if (!OnlineEnabled || DeletionPending) return false;
             try
             {
                 bool connected;
@@ -215,7 +261,11 @@ namespace DungeonDash
                 else
                 {
                     int initialBalance = Mathf.Max(0, _host.Coins - _save.marketPendingCoinDelta);
-                    connected = await _online.ConnectAsync(initialBalance, _save.marketPendingCoinDelta);
+                    connected = await _online.ConnectAsync(initialBalance, _save.marketPendingCoinDelta, id =>
+                    {
+                        _save.marketPlayerId = id;
+                        _host.PersistSave();
+                    });
                 }
 
                 if (!connected) return false;

@@ -37,6 +37,10 @@ namespace DungeonDash
         public string marketJson;
         public int marketPendingCoinDelta;
         public bool marketAccountInitialized;
+        public bool marketOnlineEnabled;
+        public string marketPlayerId;
+        public bool marketDeletionPending;
+        public bool marketDataDeleted;
 
         static readonly string Key = Application.isEditor || Application.isBatchMode ||
             Array.Exists(Environment.GetCommandLineArgs(), argument => argument.StartsWith("--qa-", StringComparison.Ordinal))

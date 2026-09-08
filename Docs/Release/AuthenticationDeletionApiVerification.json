@@ -1,0 +1,29 @@
+{
+  "scope": "One newly created disposable Authentication account only; no market data created or touched",
+  "responses": [
+    {
+      "operation": "delete",
+      "status": 200,
+      "title": null,
+      "detail": null
+    },
+    {
+      "operation": "repeat_delete",
+      "status": 404,
+      "title": "RESOURCE_NOT_FOUND",
+      "detail": ""
+    },
+    {
+      "operation": "get_deleted_user",
+      "status": 404,
+      "title": "RESOURCE_NOT_FOUND",
+      "detail": "user not found"
+    },
+    {
+      "operation": "resume_deleted_session",
+      "status": 401,
+      "title": "INVALID_SESSION_TOKEN",
+      "detail": "The session token is not valid."
+    }
+  ]
+}

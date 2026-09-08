@@ -21,6 +21,9 @@ namespace DungeonDashTests
                 ? Task.FromException(new Exception("no network"))
                 : Task.CompletedTask;
 
+            public Task<bool> ResumeAccountAsync() => Task.FromResult(true);
+            public Task DeleteAccountAsync() => Task.CompletedTask;
+
             public Task<OnlineMarketResponse> CallAsync(Dictionary<string, object> arguments)
             {
                 Calls++;

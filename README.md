@@ -60,6 +60,10 @@ Guild Collection. Purchases use Unity IAP and Apple product
 [COMMERCIAL_RELEASE.md](COMMERCIAL_RELEASE.md) for configuration, launch gates,
 and remaining product work.
 
+Credits and full font notices are available from the title and pause screens.
+Package notices ship in `Assets/StreamingAssets/ThirdPartyNotices.txt`. Store copy,
+asset inventories, and the privacy implementation audit are in `Docs/Release`.
+
 ### Desktop controls
 
 - `WASD` — move
@@ -102,8 +106,9 @@ hand-authored edits and regenerates the defaults.
 
 ## Artifact market
 
-Opening the market signs the player into Unity Authentication anonymously and
-connects to the `ArtifactMarket` Cloud Code endpoint. Listings are kept in Cloud
+New players start with the local simulated market. **Online Data > Connect Online**
+explains the service and opts into anonymous Unity Authentication and the
+`ArtifactMarket` Cloud Code endpoint. Existing online accounts retain their connection. Listings are kept in Cloud
 Save, and the server handles listing, buying, cancelling, claiming, and coin
 syncing. It also validates artifacts and makes repeated requests safe, so a
 retry cannot charge someone twice.
@@ -125,6 +130,13 @@ The market is authoritative for transactions and for artifacts that have
 entered it. Drops and gameplay coin rewards still originate on the client. That
 keeps the single-player game usable offline; making those rewards fully
 authoritative would require moving the combat simulation to a server as well.
+
+**Online Data** is accessible from title, pause, and market screens. Deleting an
+online account requires a separate confirmation. Pending deletion is saved before
+network work, blocks market changes, and can be retried after reopening the game.
+Local characters and paid cosmetics are preserved. See
+[the deletion implementation and deployment notes](Docs/Release/OnlineAccountDeletion.md)
+for server replay protection and the unresolved lost-confirmation support case.
 
 ### Market smoke test
 

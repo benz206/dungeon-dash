@@ -14,7 +14,6 @@ namespace DungeonDash
         Text _balance;
         UiButton _refresh;
         UiButton _claim;
-        UiButton _retry;
         float _nextStatusCheck;
         string _lastStatus;
 
@@ -22,7 +21,7 @@ namespace DungeonDash
         {
             UiKit.Shade("Shade", Root, UiPalette.Ink.Alpha(0.72f));
 
-            var dialog = UiKit.Dialog(Root, "GLOBAL MARKET", "TRADE ARTIFACTS WITH OTHER DELVERS",
+            var dialog = UiKit.Dialog(Root, "ARTIFACT MARKET", "EQUIP YOUR NEXT EXPEDITION",
                 UiPalette.Gold, 900f, 660f);
             PopTarget(dialog.Holder);
 
@@ -44,9 +43,9 @@ namespace DungeonDash
             _claim = UiKit.PushButton("Claim", dialog.Body, "CLAIM PROCEEDS", ButtonTone.Primary,
                 Game.ClaimMarket, 14);
             UiKit.Place(_claim.Rect, 180f, 64f, 218f, 40f);
-            _retry = UiKit.PushButton("Retry", dialog.Body, "RETRY ONLINE", ButtonTone.Ghost,
-                Game.RetryOnlineMarket, 14);
-            UiKit.Place(_retry.Rect, 410f, 64f, 190f, 40f);
+            var account = UiKit.PushButton("Online Data", dialog.Body, "ONLINE DATA", ButtonTone.Ghost,
+                Ui.ShowMarketAccount, 14);
+            UiKit.Place(account.Rect, 410f, 64f, 190f, 40f);
 
             var list = UiKit.ScrollList("List", dialog.Body, out _listContent);
             UiKit.Place((RectTransform)list.transform, 0f, 116f, 864f, 442f);
@@ -62,10 +61,8 @@ namespace DungeonDash
 
             _refresh.gameObject.SetActive(market.UsingOnline);
             _claim.gameObject.SetActive(market.UsingOnline);
-            _retry.gameObject.SetActive(!market.UsingOnline);
-            _refresh.Interactable = !market.Busy;
-            _claim.Interactable = !market.Busy;
-            _retry.Interactable = !market.Busy;
+            _refresh.Interactable = !market.Busy && !market.DeletionPending;
+            _claim.Interactable = !market.Busy && !market.DeletionPending;
 
             UiKit.Clear(_listContent);
             var listings = market.Listings;
@@ -108,7 +105,7 @@ namespace DungeonDash
                     else Game.BuyListing(captured);
                 }, 14);
             UiKit.Place(action.Rect, 712f, 16f, 104f, 40f);
-            action.Interactable = !market.Busy && (own || Game.Coins >= listing.price);
+            action.Interactable = !market.Busy && !market.DeletionPending && (own || Game.Coins >= listing.price);
         }
 
         protected override void Tick()

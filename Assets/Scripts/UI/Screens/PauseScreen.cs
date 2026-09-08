@@ -21,6 +21,9 @@ namespace DungeonDash
             var dialog = UiKit.Dialog(Root, "PAUSED", "THE DUNGEON HOLDS ITS BREATH",
                 UiPalette.Crimson, 700f, 440f);
             PopTarget(dialog.Holder);
+            var account = UiKit.PushButton("Online Data", dialog.HeaderActions, "ONLINE DATA", ButtonTone.Ghost,
+                Ui.ShowMarketAccount, 12);
+            UiKit.Corner(account.Rect, new Vector2(1f, 0.5f), Vector2.zero, new Vector2(190f, 42f));
 
             var portraitFrame = UiKit.Inset("Portrait", dialog.Body);
             UiKit.Place(portraitFrame.rectTransform, 0f, 0f, 124f, 124f);
@@ -69,7 +72,10 @@ namespace DungeonDash
 
             var styles = UiKit.PushButton("Styles", dialog.Body, "COSMETIC STYLES", ButtonTone.Ghost,
                 Game.OpenCosmetics, 15);
-            UiKit.Place(styles.Rect, 0f, 238f, 664f, 56f);
+            UiKit.Place(styles.Rect, 0f, 238f, 436f, 56f);
+            var credits = UiKit.PushButton("Credits", dialog.Body, "CREDITS", ButtonTone.Ghost,
+                Ui.ShowCredits, 14);
+            UiKit.Place(credits.Rect, 452f, 238f, 212f, 56f);
         }
 
         void Change(int direction)

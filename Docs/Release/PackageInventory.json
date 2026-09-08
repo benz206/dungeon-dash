@@ -1,0 +1,852 @@
+{
+  "date": "2026-09-08",
+  "lockSha256": "8f68d0bae8a3f74949a3afd0982b4b5e4a7fbaf167df22ade01a1c01da04d95c",
+  "packages": [
+    {
+      "name": "com.unity.2d.sprite",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "0a17bbd475505efe813bf30e6a613fa5dbc9935edcdcf4ce7c37d521382a839d"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.2d.tilemap",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "0f99a50b84c772f37f24c792bd12fe9c756a3a8d38063c8a21f9ab08bb0758a6"
+        },
+        {
+          "file": "Third Party Notices.md",
+          "sha256": "f3f681fca1749b3a37fa9fde7a96e068af0f8035c05b090952542d5f38846699"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.2d.tilemap.extras",
+      "version": "8.0.3",
+      "source": "registry",
+      "depth": 0,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "51cbc11999e5f1b3ec83090660c69fa8c35e95fcf9ca807edd649c51ff0a16a5"
+        },
+        {
+          "file": "Third Party Notices.md",
+          "sha256": "d4de5998983f32c55c1ababdac898ce665cc67eab5cc5fdf3b2312898b597c15"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.burst",
+      "version": "1.8.29",
+      "source": "registry",
+      "depth": 2,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "9bd567d6de754ab7396a8e3022758c617b78d7115bf1585bdb29ae0de464d059"
+        },
+        {
+          "file": "Third Party Notices.md",
+          "sha256": "01b366462da89d104fc7db01309b69de07cee05400ec429e2ea9e4c23fa5f085"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.collections",
+      "version": "6.5.0",
+      "source": "builtin",
+      "depth": 2,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "4947f647c031b0fec440237f8136386a606dd998089bb1df67316ee693f568f5"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.ext.nunit",
+      "version": "2.1.0",
+      "source": "builtin",
+      "depth": 1,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "3622d79bb4de21087d36ba91bcc84816e6fc2ace098e17eb431b9e1dfb6dde32"
+        },
+        {
+          "file": "Third Party Notices.md",
+          "sha256": "ef37b1ccbae5e9b641482cbd77a74ee96193a39d232cc8d856b9044f37db9244"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.ide.rider",
+      "version": "3.0.40",
+      "source": "registry",
+      "depth": 0,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "49d8e39c5ba9fa2e7b8403d994162ffc49dc7a366b0691fdfa4c06bbaadc4d81"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.ide.visualstudio",
+      "version": "2.0.27",
+      "source": "registry",
+      "depth": 0,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "af294e2812515c3569252d3ca7e2cb2519d82572df764529ac45ca72359e4995"
+        },
+        {
+          "file": "ThirdPartyNotices.md",
+          "sha256": "08f3213e8b9842a65a58bcc6893a9eedcfb47bb74c89c5764627b7cc3e1a2763"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.inputsystem",
+      "version": "1.19.0",
+      "source": "registry",
+      "depth": 0,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "419718e59cd6c1f9c3ed80bd004394504bed368c23ad8665cce1792a33c8a02c"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.mathematics",
+      "version": "1.4.0",
+      "source": "builtin",
+      "depth": 3,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "5b1a26ff2ca6e6e7d9fd2b6df151e1a43c671fdf49c05dcee1227f20dcf25fde"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.accessibility",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.adaptiveperformance",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.ai",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.androidjni",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.animation",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.assetbundle",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.audio",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.cloth",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.director",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.hierarchycore",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 1,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.imageconversion",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.imgui",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.jsonserialize",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.particlesystem",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.physics",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.physics2d",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.physicscore2d",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 1,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.screencapture",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.subsystems",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 1,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.terrain",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.terrainphysics",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.tilemap",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.ui",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.uielements",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.umbra",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.unityanalytics",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.unitywebrequest",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.unitywebrequestassetbundle",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.unitywebrequestaudio",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.unitywebrequesttexture",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.unitywebrequestwww",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.vectorgraphics",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.vehicles",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.video",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.wind",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.modules.xr",
+      "version": "1.0.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.nuget.mono-cecil",
+      "version": "1.11.6",
+      "source": "registry",
+      "depth": 3,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "76101254034fbea9afc4169e98ce15382b0f130e3bf15e7da1ca599d940e1cda"
+        },
+        {
+          "file": "Third Party Notices.md",
+          "sha256": "99966d24b32096a2a1963d9ccec993cf1c729fafd359179ee727762b2dd2b4ba"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.nuget.newtonsoft-json",
+      "version": "3.2.2",
+      "source": "registry",
+      "depth": 1,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "a5177bfecfea04d225e4a26a631db86721a03b4080350867847e71dc26b44f85"
+        },
+        {
+          "file": "Third Party Notices.md",
+          "sha256": "f07d2ea4af53fd1c9800b345bb4fbfa3ab0181d8c87625d6c265cd65142df097"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.purchasing",
+      "version": "5.4.3",
+      "source": "registry",
+      "depth": 0,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "068acd9a9ce7e4ce55c80b9a92fe039d80a2fb9ba206e19edf8f0211ba013da9"
+        },
+        {
+          "file": "Third Party Notices.md",
+          "sha256": "79c2d7349739a30787888c6e79ae780c3e8b6e364d9bfba4a9ea6fc1ae6bae60"
+        }
+      ],
+      "privacyManifests": [
+        {
+          "file": "Plugins/UnityPurchasing/iOS/PrivacyInfo.xcprivacy",
+          "sha256": "c7588940966bd9a96355ff3874c54f977705af07be22a0513f4ce42ddd69e96b",
+          "contents": {
+            "NSPrivacyTrackingDomains": [],
+            "NSPrivacyAccessedAPITypes": [
+              {
+                "NSPrivacyAccessedAPITypeReasons": [
+                  "C617.1"
+                ],
+                "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp"
+              },
+              {
+                "NSPrivacyAccessedAPITypeReasons": [
+                  "E174.1"
+                ],
+                "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace"
+              }
+            ],
+            "NSPrivacyCollectedDataTypes": [],
+            "NSPrivacyTracking": false
+          }
+        },
+        {
+          "file": "Plugins/UnityPurchasing/unitypurchasing.bundle/Contents/Resources/PrivacyInfo.xcprivacy",
+          "sha256": "c7588940966bd9a96355ff3874c54f977705af07be22a0513f4ce42ddd69e96b",
+          "contents": {
+            "NSPrivacyTrackingDomains": [],
+            "NSPrivacyAccessedAPITypes": [
+              {
+                "NSPrivacyAccessedAPITypeReasons": [
+                  "C617.1"
+                ],
+                "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp"
+              },
+              {
+                "NSPrivacyAccessedAPITypeReasons": [
+                  "E174.1"
+                ],
+                "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace"
+              }
+            ],
+            "NSPrivacyCollectedDataTypes": [],
+            "NSPrivacyTracking": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "com.unity.render-pipelines.core",
+      "version": "17.5.0",
+      "source": "builtin",
+      "depth": 1,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "39691adc5fdaf614d951f53637e22501baf46fcc535a69ab8a21ebaa8b9e9cb4"
+        },
+        {
+          "file": "THIRD PARTY NOTICES.md",
+          "sha256": "fdfacc9a242bda05b26eace324033b467b7d70e83a2761cd03337b612affc339"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.render-pipelines.universal",
+      "version": "17.5.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "fa2dcbc8ff967f49342c6c61854909ba4bbcc70b27f07d25538b8eaf7be5be3c"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.render-pipelines.universal-config",
+      "version": "17.5.0",
+      "source": "builtin",
+      "depth": 1,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "fa2dcbc8ff967f49342c6c61854909ba4bbcc70b27f07d25538b8eaf7be5be3c"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.searcher",
+      "version": "4.9.4",
+      "source": "registry",
+      "depth": 2,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "9086cf20ede8c45e5c1fec53884c852459e55681f3bb88ada7c8850a975d6854"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.services.authentication",
+      "version": "3.7.3",
+      "source": "registry",
+      "depth": 0,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "3fc2121cb513394f8fe3cfc56956b5cd1a647d7d03d0f38880304e254ee1106e"
+        },
+        {
+          "file": "Third Party Notices.md",
+          "sha256": "b784d8059bdca4d04d4a1171030330a9244a4e7d03c56879e868c6a7f466af18"
+        }
+      ],
+      "privacyManifests": [
+        {
+          "file": "Runtime/PrivacyInfo.xcprivacy",
+          "sha256": "2c59f566aa8ba144e56d60b840dddfa160ac0f0a2e2bd89f34cc36342a658118",
+          "contents": {
+            "NSPrivacyTracking": false,
+            "NSPrivacyTrackingDomains": [],
+            "NSPrivacyCollectedDataTypes": [
+              {
+                "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeEmailAddress",
+                "NSPrivacyCollectedDataTypeLinked": true,
+                "NSPrivacyCollectedDataTypeTracking": false,
+                "NSPrivacyCollectedDataTypePurposes": [
+                  "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                ]
+              },
+              {
+                "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherUserContactInfo",
+                "NSPrivacyCollectedDataTypeLinked": true,
+                "NSPrivacyCollectedDataTypeTracking": false,
+                "NSPrivacyCollectedDataTypePurposes": [
+                  "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                ]
+              },
+              {
+                "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeCoarseLocation",
+                "NSPrivacyCollectedDataTypeLinked": true,
+                "NSPrivacyCollectedDataTypeTracking": false,
+                "NSPrivacyCollectedDataTypePurposes": [
+                  "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                ]
+              },
+              {
+                "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeCustomerSupport",
+                "NSPrivacyCollectedDataTypeLinked": true,
+                "NSPrivacyCollectedDataTypeTracking": false,
+                "NSPrivacyCollectedDataTypePurposes": [
+                  "NSPrivacyCollectedDataTypePurposeOther"
+                ]
+              },
+              {
+                "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeUserID",
+                "NSPrivacyCollectedDataTypeLinked": true,
+                "NSPrivacyCollectedDataTypeTracking": false,
+                "NSPrivacyCollectedDataTypePurposes": [
+                  "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                ]
+              },
+              {
+                "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherUsageData",
+                "NSPrivacyCollectedDataTypeLinked": true,
+                "NSPrivacyCollectedDataTypeTracking": false,
+                "NSPrivacyCollectedDataTypePurposes": [
+                  "NSPrivacyCollectedDataTypePurposeAppFunctionality",
+                  "NSPrivacyCollectedDataTypePurposeAnalytics"
+                ]
+              },
+              {
+                "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeCrashData",
+                "NSPrivacyCollectedDataTypeLinked": false,
+                "NSPrivacyCollectedDataTypeTracking": false,
+                "NSPrivacyCollectedDataTypePurposes": [
+                  "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                ]
+              }
+            ],
+            "NSPrivacyAccessedAPITypes": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "com.unity.services.cloudcode",
+      "version": "2.10.4",
+      "source": "registry",
+      "depth": 0,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "3944ca1ab59df27b8d8a9a0e523ae6dbac123a4fa8c41d9669443df1602ceb4d"
+        },
+        {
+          "file": "Third Party Notices.md",
+          "sha256": "c75d4e1eb1d060585ef6ac289530a337feca11ddac53c7d0d457b4513ca05432"
+        }
+      ],
+      "privacyManifests": [
+        {
+          "file": "PrivacyInfo.xcprivacy",
+          "sha256": "983e58d18c4a24cfca6a39c17dc902a191c2cc4b35b9925dcb7f06926cc05d1b",
+          "contents": {
+            "NSPrivacyTrackingDomains": [],
+            "NSPrivacyTracking": false,
+            "NSPrivacyAccessedAPITypes": [],
+            "NSPrivacyCollectedDataTypes": [
+              {
+                "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeUserID",
+                "NSPrivacyCollectedDataTypeLinked": true,
+                "NSPrivacyCollectedDataTypeTracking": false,
+                "NSPrivacyCollectedDataTypePurposes": [
+                  "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                ]
+              },
+              {
+                "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeCoarseLocation",
+                "NSPrivacyCollectedDataTypeLinked": true,
+                "NSPrivacyCollectedDataTypeTracking": false,
+                "NSPrivacyCollectedDataTypePurposes": [
+                  "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "com.unity.services.core",
+      "version": "1.18.0",
+      "source": "registry",
+      "depth": 1,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "4d420941694555cbb3309715dd852d78f18daea5e5a758f39433d7070ffefb62"
+        }
+      ],
+      "privacyManifests": [
+        {
+          "file": "Runtime/PrivacyInfo.xcprivacy",
+          "sha256": "c7bbac611850c30628341bdac7ba544a7c3ffd3ab02662df819df92cb62dba10",
+          "contents": {
+            "NSPrivacyTracking": false,
+            "NSPrivacyTrackingDomains": [],
+            "NSPrivacyCollectedDataTypes": [],
+            "NSPrivacyAccessedAPITypes": [
+              {
+                "NSPrivacyAccessedAPITypeReasons": [
+                  "CA92.1"
+                ],
+                "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "com.unity.services.wire",
+      "version": "1.4.4",
+      "source": "registry",
+      "depth": 1,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "e488cf7084c094613e70ade7a4bf3f1f309ad29c6391c88aa265dcd45be39033"
+        },
+        {
+          "file": "Third Party Notices.md",
+          "sha256": "2dfe4f3de7987f1926ba050166479054d66f49cf8bccfa47992a3abe0f84fb0a"
+        }
+      ],
+      "privacyManifests": [
+        {
+          "file": "Runtime/PrivacyInfo.xcprivacy",
+          "sha256": "2a878282379df32da73f18a16764bbba0f5a68633553bbe20a72516c1797255c",
+          "contents": {
+            "NSPrivacyTracking": false,
+            "NSPrivacyTrackingDomains": [],
+            "NSPrivacyCollectedDataTypes": [
+              {
+                "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeCoarseLocation",
+                "NSPrivacyCollectedDataTypeLinked": true,
+                "NSPrivacyCollectedDataTypeTracking": false,
+                "NSPrivacyCollectedDataTypePurposes": [
+                  "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "com.unity.shadergraph",
+      "version": "17.5.0",
+      "source": "builtin",
+      "depth": 1,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "364b0c08b7fe15b70c4777dccb26fc21d02ae831c2f707dbe29879ac15ece353"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.test-framework",
+      "version": "1.7.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "d3b09e9683afbc8d468a83000308f18e7133eaf7879af870747000a66e3c0693"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.test-framework.performance",
+      "version": "3.5.0",
+      "source": "registry",
+      "depth": 3,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "202adffac8b9d21d3b148a294d241894f3bcef85724c01b6a0bd52269a3798c8"
+        },
+        {
+          "file": "Third Party Notices.md",
+          "sha256": "361cdb83b8f7c4868ad5c61d8014ab423d9229919219f77bae1eb36084e0227a"
+        }
+      ],
+      "privacyManifests": []
+    },
+    {
+      "name": "com.unity.ugui",
+      "version": "2.5.0",
+      "source": "builtin",
+      "depth": 0,
+      "notices": [
+        {
+          "file": "LICENSE.md",
+          "sha256": "a8e0cae87b2edb8c205ae6c308f20b89a09f32d62bd4a3ff0343bb4724a4201e"
+        }
+      ],
+      "privacyManifests": []
+    }
+  ]
+}

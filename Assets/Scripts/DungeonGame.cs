@@ -777,7 +777,6 @@ namespace DungeonDash
 
         public void ClaimMarket() => _market.Claim();
 
-        public void RetryOnlineMarket() => _market.Open();
 
         public void ChangeVolume(int direction)
         {
@@ -916,6 +915,25 @@ namespace DungeonDash
                 .Substring(viewArgument.Length);
             switch (view)
             {
+                case "account" or "account-confirm" or "account-pending":
+                    ShowTitle();
+                    _save.marketAccountInitialized = view != "account";
+                    _save.marketOnlineEnabled = false;
+                    _save.marketPlayerId = view == "account" ? string.Empty : "qa-preview-only";
+                    _save.marketDeletionPending = view == "account-pending";
+                    _ui.ShowMarketAccount();
+                    if (view == "account-confirm")
+                    {
+                        _ui.GetComponentInChildren<MarketAccountPanel>().GetComponentsInChildren<UiButton>()
+                            .First(button => button.name == "Delete").OnPointerClick(null);
+                        if (_save.marketDeletionPending)
+                            throw new InvalidOperationException("The first deletion click must only show confirmation.");
+                    }
+                    break;
+                case "credits":
+                    ShowTitle();
+                    _ui.ShowCredits();
+                    break;
                 case "slots":
                     OpenSlotSelect();
                     break;

@@ -17,12 +17,15 @@ namespace DungeonDash
         public int balance;
         public int pendingCoins;
         public Artifact artifact;
+        public bool accountDataDeleted;
     }
 
     public interface IOnlineMarketGateway
     {
         string PlayerId { get; }
         Task InitializeAsync();
+        Task<bool> ResumeAccountAsync();
+        Task DeleteAccountAsync();
         Task<OnlineMarketResponse> CallAsync(Dictionary<string, object> arguments);
     }
 
@@ -31,6 +34,15 @@ namespace DungeonDash
         public string PlayerId => AuthenticationService.Instance.PlayerId;
 
         public async Task InitializeAsync()
+        {
+            await InitializeServicesAsync();
+            if (Array.Exists(Environment.GetCommandLineArgs(), x => x == "--qa-fresh-auth"))
+                AuthenticationService.Instance.SignOut(true);
+            if (!AuthenticationService.Instance.IsAuthorized)
+                await AuthenticationService.Instance.SignInAnonymouslyAsync();
+        }
+
+        static async Task InitializeServicesAsync()
         {
             var options = new InitializationOptions();
             const string environmentArgument = "--ugs-environment=";
@@ -41,11 +53,19 @@ namespace DungeonDash
                 break;
             }
             await UnityServices.InitializeAsync(options);
-            if (Array.Exists(Environment.GetCommandLineArgs(), x => x == "--qa-fresh-auth"))
-                AuthenticationService.Instance.SignOut(true);
-            if (!AuthenticationService.Instance.IsSignedIn)
-                await AuthenticationService.Instance.SignInAnonymouslyAsync();
         }
+
+        public async Task<bool> ResumeAccountAsync()
+        {
+            await InitializeServicesAsync();
+            var auth = AuthenticationService.Instance;
+            if (auth.IsAuthorized) return true;
+            if (!auth.SessionTokenExists) return false;
+            await auth.SignInAnonymouslyAsync(new SignInOptions { CreateAccount = false });
+            return true;
+        }
+
+        public Task DeleteAccountAsync() => AuthenticationService.Instance.DeleteAccountAsync();
 
         public Task<OnlineMarketResponse> CallAsync(Dictionary<string, object> arguments) =>
             CloudCodeService.Instance.CallEndpointAsync<OnlineMarketResponse>("ArtifactMarket", arguments);
@@ -67,14 +87,16 @@ namespace DungeonDash
         public string Status { get; private set; } = "Online market not connected";
         public string PlayerId => IsOnline ? _gateway.PlayerId : string.Empty;
 
-        public async Task<bool> ConnectAsync(int initialBalance, int pendingCoinDelta)
+        public async Task<bool> ConnectAsync(int initialBalance, int pendingCoinDelta, Action<string> accountReady = null)
         {
+            if (Busy) return false;
             if (IsOnline) return true;
             Busy = true;
             Status = "Connecting to Unity Gaming Services...";
             try
             {
                 await _gateway.InitializeAsync();
+                accountReady?.Invoke(_gateway.PlayerId);
                 Apply(await CallMutationAsync("connect", new Dictionary<string, object>
                 {
                     ["initialBalance"] = initialBalance
@@ -120,8 +142,71 @@ namespace DungeonDash
         public Task<OnlineMarketResponse> SyncCoinsAsync(int amount) =>
             RunAsync("syncCoins", new Dictionary<string, object> { ["amount"] = amount });
 
+        public async Task<bool> DeleteAccountAsync(SaveData save)
+        {
+            if (Busy) return false;
+            Busy = true;
+            IsOnline = false;
+            _listings.Clear();
+            save.marketDeletionPending = true;
+            save.marketOnlineEnabled = false;
+            save.Save();
+            Status = "Deleting online account...";
+            try
+            {
+                if (!await _gateway.ResumeAccountAsync())
+                {
+                    // Missing credentials are not proof that a known account was deleted.
+                    if (save.marketAccountInitialized || !string.IsNullOrEmpty(save.marketPlayerId) || save.marketDataDeleted)
+                        throw new InvalidOperationException("The saved account is no longer accessible.");
+                    CompleteDeletion(save);
+                    Status = "No saved online account found. Local market selected.";
+                    return true;
+                }
+
+                string playerId = _gateway.PlayerId;
+                if (!string.IsNullOrEmpty(save.marketPlayerId) && save.marketPlayerId != playerId)
+                    throw new InvalidOperationException("The signed-in account does not match the deletion request.");
+                save.marketPlayerId = playerId;
+                save.Save();
+
+                // Repeat this idempotent step on retry, renewing the server replay barrier.
+                var response = await CallMutationAsync("deleteAccountData", null);
+                if (response == null || !response.ok || !response.accountDataDeleted)
+                    throw new InvalidOperationException("The server did not confirm removal of market data.");
+                save.marketDataDeleted = true;
+                save.Save();
+                await _gateway.DeleteAccountAsync();
+                CompleteDeletion(save);
+                Status = "Online account deleted. Local progress and cosmetics kept.";
+                return true;
+            }
+            catch
+            {
+                Status = "Deletion unconfirmed. Reconnect and retry; keep your support ID.";
+                return false;
+            }
+            finally
+            {
+                Busy = false;
+            }
+        }
+
+        void CompleteDeletion(SaveData save)
+        {
+            Balance = PendingCoins = 0;
+            save.marketDeletionPending = false;
+            save.marketDataDeleted = false;
+            save.marketAccountInitialized = false;
+            save.marketOnlineEnabled = false;
+            save.marketPlayerId = string.Empty;
+            save.marketPendingCoinDelta = 0;
+            save.Save();
+        }
+
         async Task<OnlineMarketResponse> RunAsync(string action, Dictionary<string, object> arguments = null)
         {
+            if (Busy) throw new InvalidOperationException("A market request is already in progress.");
             if (!IsOnline) throw new InvalidOperationException("Online market is not connected.");
             Busy = true;
             Status = $"Online · {action}...";
