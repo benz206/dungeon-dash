@@ -1,0 +1,517 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-9145636064244553271
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b534a98001d7a4ba4b7bcc7a7a2210ac, type: 3}
+  m_Name: overgrowth
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.ChamberTheme
+  id: overgrowth
+  displayName: The Overgrowth
+  floorWear: 0.35
+  grassChance: 0.55
+  propDensity: 0.5
+  floorTint: {r: 0.9, g: 1, b: 0.9, a: 1}
+  wallTint: {r: 0.86, g: 0.95, b: 0.86, a: 1}
+  accent: {r: 0.42, g: 0.72, b: 0.36, a: 1}
+  props:
+  - {fileID: 1466297122582216537}
+  - {fileID: -9027402845179210249}
+  - {fileID: -1159631939232532806}
+  - {fileID: 7528651565612160364}
+  - {fileID: 9201000889437575821}
+--- !u!114 &-9027402845179210249
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37acfb094d47e483880afdda67ca0ec2, type: 3}
+  m_Name: pit
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.PropDefinition
+  id: pit
+  spriteNames:
+  - hole
+  framesPerSecond: 0
+  placement: 0
+  blocksMovement: 0
+  weight: 0.6
+  maxPerRoom: 2
+  offset: {x: 0, y: 0}
+  scale: 1
+  tint: {r: 1, g: 1, b: 1, a: 1}
+--- !u!114 &-7947515676472508407
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0145fb9287c414b939d89c78133be2c9, type: 3}
+  m_Name: combat_pit
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.RoomTemplate
+  id: combat_pit
+  role: 1
+  shape: 0
+  minSize: {x: 11, y: 9}
+  maxSize: {x: 17, y: 13}
+  weight: 1.2
+  minDepth: 1
+  propDensity: 0.8
+  enemyShare: 1.4
+--- !u!114 &-7748629110375777396
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b534a98001d7a4ba4b7bcc7a7a2210ac, type: 3}
+  m_Name: foundry
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.ChamberTheme
+  id: foundry
+  displayName: The Foundry
+  floorWear: 0.75
+  grassChance: 0
+  propDensity: 0.55
+  floorTint: {r: 1, g: 0.92, b: 0.85, a: 1}
+  wallTint: {r: 1, g: 0.88, b: 0.8, a: 1}
+  accent: {r: 0.85, g: 0.42, b: 0.18, a: 1}
+  props:
+  - {fileID: 1466297122582216537}
+  - {fileID: -4687898199201857334}
+  - {fileID: -6866610934537420694}
+  - {fileID: 9201000889437575821}
+--- !u!114 &-6866610934537420694
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37acfb094d47e483880afdda67ca0ec2, type: 3}
+  m_Name: lever
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.PropDefinition
+  id: lever
+  spriteNames:
+  - lever_left
+  framesPerSecond: 0
+  placement: 1
+  blocksMovement: 0
+  weight: 0.5
+  maxPerRoom: 1
+  offset: {x: 0, y: 0}
+  scale: 1
+  tint: {r: 1, g: 1, b: 1, a: 1}
+--- !u!114 &-6730800489151958708
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0145fb9287c414b939d89c78133be2c9, type: 3}
+  m_Name: entry_hall
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.RoomTemplate
+  id: entry_hall
+  role: 0
+  shape: 0
+  minSize: {x: 11, y: 9}
+  maxSize: {x: 15, y: 11}
+  weight: 1
+  minDepth: 1
+  propDensity: 0.5
+  enemyShare: 0.6
+--- !u!114 &-4687898199201857334
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37acfb094d47e483880afdda67ca0ec2, type: 3}
+  m_Name: spikes
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.PropDefinition
+  id: spikes
+  spriteNames:
+  - floor_spikes_anim_f0
+  - floor_spikes_anim_f1
+  - floor_spikes_anim_f2
+  - floor_spikes_anim_f3
+  framesPerSecond: 6
+  placement: 0
+  blocksMovement: 0
+  weight: 0.8
+  maxPerRoom: 3
+  offset: {x: 0, y: 0}
+  scale: 1
+  tint: {r: 1, g: 1, b: 1, a: 1}
+--- !u!114 &-4079460753534926532
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0145fb9287c414b939d89c78133be2c9, type: 3}
+  m_Name: treasure_vault
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.RoomTemplate
+  id: treasure_vault
+  role: 2
+  shape: 0
+  minSize: {x: 9, y: 7}
+  maxSize: {x: 11, y: 9}
+  weight: 1
+  minDepth: 1
+  propDensity: 1.6
+  enemyShare: 0.7
+--- !u!114 &-3355777681781972531
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0145fb9287c414b939d89c78133be2c9, type: 3}
+  m_Name: hall_rotunda
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.RoomTemplate
+  id: hall_rotunda
+  role: 3
+  shape: 2
+  minSize: {x: 11, y: 9}
+  maxSize: {x: 15, y: 11}
+  weight: 0.7
+  minDepth: 2
+  propDensity: 1
+  enemyShare: 0.9
+--- !u!114 &-3211001680593410734
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0145fb9287c414b939d89c78133be2c9, type: 3}
+  m_Name: treasure_grotto
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.RoomTemplate
+  id: treasure_grotto
+  role: 2
+  shape: 2
+  minSize: {x: 9, y: 7}
+  maxSize: {x: 11, y: 9}
+  weight: 0.6
+  minDepth: 4
+  propDensity: 1.5
+  enemyShare: 0.7
+--- !u!114 &-1159631939232532806
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37acfb094d47e483880afdda67ca0ec2, type: 3}
+  m_Name: column
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.PropDefinition
+  id: column
+  spriteNames:
+  - column
+  framesPerSecond: 0
+  placement: 2
+  blocksMovement: 1
+  weight: 1
+  maxPerRoom: 4
+  offset: {x: 0, y: 1}
+  scale: 1
+  tint: {r: 1, g: 1, b: 1, a: 1}
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b73c8b49d1824a2189c17fe0485a85a, type: 3}
+  m_Name: LevelLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.LevelLibrary
+  themes:
+  - {fileID: 5062710054083117503}
+  - {fileID: -9145636064244553271}
+  - {fileID: -7748629110375777396}
+  - {fileID: 5522774030863209090}
+  templates:
+  - {fileID: -6730800489151958708}
+  - {fileID: 6971576391663871831}
+  - {fileID: -7947515676472508407}
+  - {fileID: 7098990197503166281}
+  - {fileID: 6476325094556256217}
+  - {fileID: 4257137019766787315}
+  - {fileID: -3355777681781972531}
+  - {fileID: -4079460753534926532}
+  - {fileID: -3211001680593410734}
+  props:
+  - {fileID: 1466297122582216537}
+  - {fileID: -1159631939232532806}
+  - {fileID: 9201000889437575821}
+  - {fileID: -9027402845179210249}
+  - {fileID: -4687898199201857334}
+  - {fileID: 4138353614219209005}
+  - {fileID: 7528651565612160364}
+  - {fileID: -6866610934537420694}
+  minRooms: 2
+  maxRooms: 4
+--- !u!114 &1466297122582216537
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37acfb094d47e483880afdda67ca0ec2, type: 3}
+  m_Name: crate
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.PropDefinition
+  id: crate
+  spriteNames:
+  - crate
+  framesPerSecond: 0
+  placement: 0
+  blocksMovement: 1
+  weight: 1.4
+  maxPerRoom: 4
+  offset: {x: 0, y: 0.25}
+  scale: 1
+  tint: {r: 1, g: 1, b: 1, a: 1}
+--- !u!114 &4138353614219209005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37acfb094d47e483880afdda67ca0ec2, type: 3}
+  m_Name: ladder
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.PropDefinition
+  id: ladder
+  spriteNames:
+  - floor_ladder
+  framesPerSecond: 0
+  placement: 1
+  blocksMovement: 0
+  weight: 0.5
+  maxPerRoom: 1
+  offset: {x: 0, y: 0}
+  scale: 1
+  tint: {r: 1, g: 1, b: 1, a: 1}
+--- !u!114 &4257137019766787315
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0145fb9287c414b939d89c78133be2c9, type: 3}
+  m_Name: hall_gallery
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.RoomTemplate
+  id: hall_gallery
+  role: 3
+  shape: 4
+  minSize: {x: 11, y: 7}
+  maxSize: {x: 15, y: 9}
+  weight: 1
+  minDepth: 1
+  propDensity: 1.2
+  enemyShare: 0.8
+--- !u!114 &5062710054083117503
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b534a98001d7a4ba4b7bcc7a7a2210ac, type: 3}
+  m_Name: catacombs
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.ChamberTheme
+  id: catacombs
+  displayName: The Catacombs
+  floorWear: 0.18
+  grassChance: 0
+  propDensity: 0.4
+  floorTint: {r: 0.96, g: 0.95, b: 0.98, a: 1}
+  wallTint: {r: 1, g: 1, b: 1, a: 1}
+  accent: {r: 0.72, g: 0.53, b: 0.31, a: 1}
+  props:
+  - {fileID: 1466297122582216537}
+  - {fileID: 9201000889437575821}
+  - {fileID: -1159631939232532806}
+  - {fileID: -9027402845179210249}
+--- !u!114 &5522774030863209090
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b534a98001d7a4ba4b7bcc7a7a2210ac, type: 3}
+  m_Name: sanctum
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.ChamberTheme
+  id: sanctum
+  displayName: The Sanctum
+  floorWear: 0.12
+  grassChance: 0.2
+  propDensity: 0.35
+  floorTint: {r: 0.9, g: 0.94, b: 1, a: 1}
+  wallTint: {r: 0.88, g: 0.92, b: 1, a: 1}
+  accent: {r: 0.36, g: 0.62, b: 0.92, a: 1}
+  props:
+  - {fileID: -1159631939232532806}
+  - {fileID: 4138353614219209005}
+  - {fileID: 7528651565612160364}
+  - {fileID: 9201000889437575821}
+--- !u!114 &6476325094556256217
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0145fb9287c414b939d89c78133be2c9, type: 3}
+  m_Name: combat_crossing
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.RoomTemplate
+  id: combat_crossing
+  role: 1
+  shape: 1
+  minSize: {x: 13, y: 11}
+  maxSize: {x: 17, y: 13}
+  weight: 0.8
+  minDepth: 3
+  propDensity: 0.7
+  enemyShare: 1.2
+--- !u!114 &6971576391663871831
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0145fb9287c414b939d89c78133be2c9, type: 3}
+  m_Name: entry_rotunda
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.RoomTemplate
+  id: entry_rotunda
+  role: 0
+  shape: 2
+  minSize: {x: 11, y: 9}
+  maxSize: {x: 13, y: 11}
+  weight: 0.5
+  minDepth: 3
+  propDensity: 0.5
+  enemyShare: 0.6
+--- !u!114 &7098990197503166281
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0145fb9287c414b939d89c78133be2c9, type: 3}
+  m_Name: combat_colonnade
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.RoomTemplate
+  id: combat_colonnade
+  role: 1
+  shape: 3
+  minSize: {x: 13, y: 11}
+  maxSize: {x: 17, y: 13}
+  weight: 0.9
+  minDepth: 2
+  propDensity: 0.6
+  enemyShare: 1.3
+--- !u!114 &7528651565612160364
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37acfb094d47e483880afdda67ca0ec2, type: 3}
+  m_Name: stairs
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.PropDefinition
+  id: stairs
+  spriteNames:
+  - floor_stairs
+  framesPerSecond: 0
+  placement: 3
+  blocksMovement: 0
+  weight: 0.4
+  maxPerRoom: 1
+  offset: {x: 0, y: 0}
+  scale: 1
+  tint: {r: 1, g: 1, b: 1, a: 1}
+--- !u!114 &9201000889437575821
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37acfb094d47e483880afdda67ca0ec2, type: 3}
+  m_Name: skull
+  m_EditorClassIdentifier: Assembly-CSharp::DungeonDash.PropDefinition
+  id: skull
+  spriteNames:
+  - skull
+  framesPerSecond: 0
+  placement: 0
+  blocksMovement: 0
+  weight: 0.9
+  maxPerRoom: 3
+  offset: {x: 0, y: 0}
+  scale: 1
+  tint: {r: 1, g: 1, b: 1, a: 1}

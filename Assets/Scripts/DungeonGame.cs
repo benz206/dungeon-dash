@@ -7,7 +7,7 @@ using UnityEngine.InputSystem;
 
 namespace DungeonDash
 {
-    public enum GameMode { StartScreen, CharacterSelect, HomeHub, InDungeon, Market, Inventory, Paused, GameOver }
+    public enum GameMode { StartScreen, CharacterSelect, HomeHub, InDungeon, Market, Inventory, Paused, GameOver, Cosmetics }
 
     public sealed class DungeonGame : MonoBehaviour, IMarketHost
     {
@@ -31,14 +31,20 @@ namespace DungeonDash
 
         GameMode _mode = GameMode.StartScreen;
         GameMode _returnMode = GameMode.HomeHub;
+        GameMode _cosmeticsReturnMode = GameMode.StartScreen;
         bool _creatingSlot;
         bool _overlayOwnsPause;
         float _timeScaleBeforeOverlay = 1f;
         bool _transitioning;
+        bool _pauseAfterTransition;
         float _transitionAmount;
         string _transitionLabel = string.Empty;
         int _weaponCursor;
         int _volumeStep;
+        int _chamberSeed;
+        bool _runReady;
+        float _nextCheckpoint;
+        Vector2 _tutorialOrigin;
 
         public bool WorldRunning => (_mode == GameMode.HomeHub || _mode == GameMode.InDungeon) && !_transitioning;
         public bool AcceptsGameplayInput => WorldRunning;
@@ -47,6 +53,10 @@ namespace DungeonDash
         public bool RoomExitUnlocked => _world?.ExitDoor?.Unlocked ?? false;
         public int CurrentRoom => _combat.Wave;
         public int Kills => _combat.Kills;
+        public int BestChamberCleared => _activeSlot?.bestChamberCleared ?? 0;
+        public int LifetimeKills => _activeSlot?.lifetimeKills ?? 0;
+        public string GuildRank => _activeSlot?.GuildRank ?? "DELVER";
+        public string ProgressGoal => _activeSlot?.NextGoal ?? string.Empty;
         public GameMode Mode => _mode;
         public CatalogIndex Catalog => _catalog;
         public MarketController Market => _market;
@@ -55,6 +65,11 @@ namespace DungeonDash
         public ChamberTheme Theme => _world?.Theme;
         public Artifact EquippedArtifact => _equipped;
         public int VolumeStep => _volumeStep;
+        public MobileControls TouchControls => _ui?.TouchControls;
+        public CosmeticStore Cosmetics { get; private set; }
+        public bool CosmeticsFromTitle => _cosmeticsReturnMode == GameMode.StartScreen;
+        public string TutorialHint => _activeSlot == null ? null : FirstRunGuide.Hint(
+            _activeSlot.tutorialActions, _combat.Wave == 0, MobileControls.Enabled);
 
         static readonly Artifact[] NoArtifacts = Array.Empty<Artifact>();
 
@@ -110,6 +125,18 @@ namespace DungeonDash
             _save = SaveData.Load();
             _market = new MarketController(this, _save, new LocalMarketService(_save.marketJson), new UgsMarketService());
             _market.Seed(_catalog, _random);
+            Cosmetics = gameObject.AddComponent<CosmeticStore>();
+            Cosmetics.Initialize(this);
+
+            if (Application.isMobilePlatform)
+            {
+                Application.targetFrameRate = 60;
+                Screen.autorotateToPortrait = false;
+                Screen.autorotateToPortraitUpsideDown = false;
+                Screen.autorotateToLandscapeLeft = true;
+                Screen.autorotateToLandscapeRight = true;
+                Screen.orientation = ScreenOrientation.AutoRotation;
+            }
 
             ConfigureCamera();
             _volumeStep = GameAudio.MutedForAutomation ? 0 : GameAudio.SavedVolumeStep;
@@ -120,12 +147,30 @@ namespace DungeonDash
             ApplyMode();
         }
 
-        void Start() => RunQaArguments();
+        void Start()
+        {
+            Cosmetics.Connect();
+            RunQaArguments();
+        }
 
         void Update()
         {
+            if (AcceptsGameplayInput && _player != null &&
+                (PlayerPosition - _tutorialOrigin).sqrMagnitude >= 4f)
+                RecordTutorialAction(TutorialAction.Move);
+            if (_runReady && CombatActive && Time.unscaledTime >= _nextCheckpoint) PersistSave();
+            if (_pauseAfterTransition && !_transitioning)
+            {
+                _pauseAfterTransition = false;
+                SetPauseOpen(true);
+            }
             var keyboard = Keyboard.current;
             if (keyboard == null) return;
+            if (_mode == GameMode.Cosmetics)
+            {
+                if (keyboard.escapeKey.wasPressedThisFrame) CloseCosmetics();
+                return;
+            }
             if (_mode is GameMode.StartScreen or GameMode.CharacterSelect or GameMode.GameOver) return;
             if (_mode == GameMode.Paused)
             {
@@ -156,7 +201,7 @@ namespace DungeonDash
         void ToggleInventory()
         {
             if (_mode == GameMode.Inventory) { SetInventoryOpen(false); return; }
-            if (_mode == GameMode.Market) _mode = _returnMode;
+            if (_mode == GameMode.Market) CloseMarket();
             SetInventoryOpen(true);
         }
 
@@ -170,7 +215,12 @@ namespace DungeonDash
         public void OpenMarketOverlay()
         {
             if (_mode != GameMode.HomeHub && _mode != GameMode.InDungeon) return;
+            if (_transitioning) return;
             _returnMode = _mode;
+            GameFeel.EndHitStop();
+            _timeScaleBeforeOverlay = Time.timeScale;
+            Time.timeScale = 0f;
+            _overlayOwnsPause = true;
             SetMode(GameMode.Market);
             GameAudio.Play("ui_click", 0.5f);
             _market.Open();
@@ -180,6 +230,7 @@ namespace DungeonDash
         {
             if (_mode != GameMode.Market) return;
             SetMode(_returnMode);
+            ReleaseOverlayPause();
             GameAudio.Play("ui_click", 0.5f);
         }
 
@@ -191,11 +242,12 @@ namespace DungeonDash
 
         public void SetInventoryOpen(bool open)
         {
-            if ((_mode == GameMode.Inventory) == open) return;
+            if ((_mode == GameMode.Inventory) == open || (open && _transitioning)) return;
             if (open)
             {
                 if (_mode != GameMode.HomeHub && _mode != GameMode.InDungeon) return;
                 _returnMode = _mode;
+                GameFeel.EndHitStop();
                 _timeScaleBeforeOverlay = Time.timeScale;
                 Time.timeScale = 0f;
                 _overlayOwnsPause = true;
@@ -212,11 +264,12 @@ namespace DungeonDash
 
         public void SetPauseOpen(bool open)
         {
-            if ((_mode == GameMode.Paused) == open) return;
+            if ((_mode == GameMode.Paused) == open || (open && _transitioning)) return;
             if (open)
             {
                 if (_mode != GameMode.HomeHub && _mode != GameMode.InDungeon) return;
                 _returnMode = _mode;
+                GameFeel.EndHitStop();
                 _timeScaleBeforeOverlay = Time.timeScale;
                 Time.timeScale = 0f;
                 _overlayOwnsPause = true;
@@ -241,6 +294,9 @@ namespace DungeonDash
 
         public void ShowTitle()
         {
+            PersistSave();
+            ReleaseOverlayPause();
+            ClearWorld();
             _creatingSlot = false;
             SetMode(GameMode.StartScreen);
         }
@@ -276,7 +332,12 @@ namespace DungeonDash
         {
             _creatingSlot = false;
             ActivateSlot(index);
-            BuildHub();
+            var checkpoint = _activeSlot.run;
+            if (checkpoint != null && checkpoint.CanResume &&
+                checkpoint.usesLevelLibrary == (_library != null && _library.IsUsable) &&
+                checkpoint.enemies.All(enemy => enemy.health > 0 && _catalog.Enemy(enemy.skinId) != null))
+                RestoreRun(checkpoint);
+            else BuildHub();
         }
 
         public void DeleteSlotAt(int index)
@@ -287,6 +348,19 @@ namespace DungeonDash
         }
 
         public void QuitGame() => Application.Quit();
+
+        public void OpenCosmetics()
+        {
+            if (_mode != GameMode.StartScreen && _mode != GameMode.Paused) return;
+            _cosmeticsReturnMode = _mode;
+            SetMode(GameMode.Cosmetics);
+            Cosmetics.Connect();
+        }
+
+        public void CloseCosmetics()
+        {
+            if (_mode == GameMode.Cosmetics) SetMode(_cosmeticsReturnMode);
+        }
 
         void EnsureSlotForCharacter(string characterId)
         {
@@ -309,6 +383,9 @@ namespace DungeonDash
 
         void ActivateSlot(int index)
         {
+            PersistSave();
+            ReleaseOverlayPause();
+            ClearWorld();
             _save.activeSlot = index;
             _activeSlot = _save.slots[index];
             EnsureStartingInventory();
@@ -353,12 +430,16 @@ namespace DungeonDash
         public void BuildHub()
         {
             ClearWorld();
+            _activeSlot.run = null;
             _world = _worldBuilder.BuildHub(this, OpenMarketFromHub, BeginDungeonTransition);
             _combat.BeginRun();
             _combat.EnterChamber(_world);
             SpawnPlayer(_world.EntryPoint);
             SetMode(GameMode.HomeHub);
-            Toast("Home — approach a destination and press E");
+            PersistSave();
+            Toast(MobileControls.Enabled
+                ? "Move with the left pad. Approach a destination to enter."
+                : "Home — approach a destination and press E");
         }
 
         void EnterDungeon()
@@ -368,24 +449,28 @@ namespace DungeonDash
             BuildChamber();
             SpawnPlayer(_world.EntryPoint);
             SetMode(GameMode.InDungeon);
-            PersistSave();
             _combat.SpawnWave();
+            _runReady = true;
+            PersistSave();
             _ui.RefreshActive();
             Toast("Clear the chamber and unlock the north door");
         }
 
-        void BuildChamber()
+        void BuildChamber(int? seed = null, int? depth = null)
         {
+            _chamberSeed = seed ?? _random.Next();
+            var random = new System.Random(_chamberSeed);
+            int chamberDepth = depth ?? _combat.Wave + 1;
             var plan = _library != null && _library.IsUsable
-                ? ChamberBuilder.Build(_random, _combat.Wave + 1, _library)
-                : LegacyPlan();
+                ? ChamberBuilder.Build(random, chamberDepth, _library)
+                : LegacyPlan(random, chamberDepth);
             _world = _worldBuilder.BuildChamber(this, plan, BeginNextRoomTransition);
             _combat.EnterChamber(_world);
         }
 
-        ChamberPlan LegacyPlan()
+        ChamberPlan LegacyPlan(System.Random random, int depth)
         {
-            var layout = DungeonGenerator.GenerateChunk(_random, _combat.Wave + 1);
+            var layout = DungeonGenerator.GenerateChunk(random, depth);
             var plan = new ChamberPlan
             {
                 Layout = layout,
@@ -401,6 +486,7 @@ namespace DungeonDash
 
         void ClearWorld()
         {
+            _runReady = false;
             _combat.ClearActors();
             if (_player != null) Destroy(_player.gameObject);
             _player = null;
@@ -411,6 +497,7 @@ namespace DungeonDash
 
         void SpawnPlayer(Vector2 position)
         {
+            _tutorialOrigin = position;
             if (_player != null) Destroy(_player.gameObject);
             var skin = ActiveSkin;
             var playerObject = WorldBuilder.CreateSprite("Player", skin.idle[0], position, 10);
@@ -422,15 +509,11 @@ namespace DungeonDash
             collider.offset = new Vector2(0f, -0.25f);
             _player = playerObject.AddComponent<PlayerController>();
             _player.Setup(this, skin);
+            playerObject.AddComponent<CosmeticAura>().Initialize(_save);
             DungeonViewportSystem.Track(_player);
         }
 
-        void OpenMarketFromHub()
-        {
-            _returnMode = GameMode.HomeHub;
-            SetMode(GameMode.Market);
-            _market.Open();
-        }
+        void OpenMarketFromHub() => OpenMarketOverlay();
 
         public void ReturnToHub()
         {
@@ -468,6 +551,7 @@ namespace DungeonDash
             _transitionLabel = $"CHAMBER {_combat.Wave + 1:00}";
             yield return AnimateTransition(0f, 1f);
 
+            _runReady = false;
             _combat.ClearActors();
             if (_world?.Root != null) Destroy(_world.Root.gameObject);
             _world = null;
@@ -482,12 +566,15 @@ namespace DungeonDash
             }
             Camera.main?.GetComponent<PlayerCenteredCamera>()?.CenterNow();
             _combat.SpawnWave();
+            _runReady = true;
+            RecordTutorialAction(TutorialAction.Exit);
             PersistSave();
 
             yield return AnimateTransition(1f, 0f);
             EndTransition();
             _ui.RefreshActive();
-            Toast($"CHAMBER {_combat.Wave:00}  ·  FIND THE EXIT");
+            Toast(_combat.Wave == 2 ? "CASTERS · Move away from their aim lines before they fire."
+                : $"CHAMBER {_combat.Wave:00}  ·  FIND THE EXIT");
         }
 
         void EndTransition()
@@ -513,10 +600,15 @@ namespace DungeonDash
         }
 
 
-        public void EnemyDied(EnemyActor enemy) => _combat.Defeat(enemy);
+        public void EnemyDied(EnemyActor enemy)
+        {
+            _combat.Defeat(enemy);
+            PersistSave();
+        }
 
         void OnEnemyDefeated(EnemyActor enemy)
         {
+            _activeSlot.lifetimeKills++;
             AddCoins(1 + _combat.Wave / 3);
             var position = enemy.transform.position;
             if (_combat.Kills % 3 == 0) DropArtifact(position);
@@ -527,17 +619,20 @@ namespace DungeonDash
 
         void OnChamberCleared()
         {
+            string previousRank = GuildRank;
+            _activeSlot.bestChamberCleared = Mathf.Max(_activeSlot.bestChamberCleared, _combat.Wave);
             int sold = _market.SimulateSales(_random);
             DropPickup(_world != null ? _world.EntryPoint : Vector2.zero, PickupKind.Chest);
             _world?.ExitDoor?.Unlock();
+            RecordTutorialAction(TutorialAction.Clear);
             GameAudio.Play("chest_open", 0.75f);
-            Toast(sold > 0
+            Toast(previousRank != GuildRank ? $"GUILD RANK: {GuildRank} · NORTH DOOR UNLOCKED" : sold > 0
                 ? $"Chamber clear — {sold} market listing sold!"
                 : "CHAMBER CLEAR  ·  NORTH DOOR UNLOCKED");
-            PersistSave();
         }
 
         public EnemyActor ProjectileTarget(Vector2 position) => _combat.ProjectileTarget(position);
+        public bool ProjectilePathClear(Vector2 from, Vector2 to) => _combat.ProjectilePathClear(from, to);
 
         public Vector2 PlayerPosition => _player == null ? Vector2.zero : (Vector2)_player.transform.position;
         public bool PlayerAlive => _player != null && _player.Health > 0;
@@ -549,6 +644,7 @@ namespace DungeonDash
         public void UseWeapon(Vector2 position, Vector2 direction, int damage, string weaponId,
             Sprite equippedSprite, bool critical)
         {
+            RecordTutorialAction(TutorialAction.Attack);
             if (WeaponRules.IsRanged(weaponId))
             {
                 Fire(position, direction, damage, _catalog.Weapon(WeaponRules.ProjectileSpriteId(weaponId)), critical);
@@ -579,13 +675,18 @@ namespace DungeonDash
         {
             string weaponId = _catalog.ArtifactWeaponIds[_weaponCursor++ % _catalog.ArtifactWeaponIds.Length];
             var artifact = ArtifactGenerator.Roll(weaponId, _random);
-            var drop = WorldBuilder.CreateSprite(artifact.displayName, _catalog.Weapon(weaponId), position, 7,
-                _combat.ActorRoot);
-            drop.AddComponent<PickupActor>().Setup(this, PickupKind.Artifact, artifact);
+            DropPickup(position, PickupKind.Artifact, artifact);
         }
 
-        void DropPickup(Vector2 position, PickupKind kind)
+        PickupActor DropPickup(Vector2 position, PickupKind kind, Artifact artifact = null)
         {
+            if (kind == PickupKind.Artifact)
+            {
+                var item = WorldBuilder.CreateSprite(artifact.displayName, _catalog.Weapon(artifact.weaponId),
+                    position, 7, _combat.ActorRoot).AddComponent<PickupActor>();
+                item.Setup(this, kind, artifact);
+                return item;
+            }
             var catalog = _catalog.Catalog;
             Sprite[] sprites = kind switch
             {
@@ -602,7 +703,9 @@ namespace DungeonDash
             };
             Sprite[] animation = kind is PickupKind.Coin or PickupKind.Bomb ? sprites : null;
             var drop = WorldBuilder.CreateSprite(kind.ToString(), sprite, position, 7, _combat.ActorRoot);
-            drop.AddComponent<PickupActor>().Setup(this, kind, null, animation);
+            var pickup = drop.AddComponent<PickupActor>();
+            pickup.Setup(this, kind, null, animation);
+            return pickup;
         }
 
         public void Collect(PickupKind kind, Artifact artifact)
@@ -641,6 +744,8 @@ namespace DungeonDash
 
         public void GameOver()
         {
+            _runReady = false;
+            _activeSlot.run = null;
             SetMode(GameMode.GameOver);
             GameAudio.Play("game_over", 0.8f);
             PersistSave();
@@ -703,10 +808,49 @@ namespace DungeonDash
 
         public void Notify(string message) => Toast(message);
 
+        public void RecordTutorialAction(TutorialAction action)
+        {
+            if (_activeSlot == null || (_activeSlot.tutorialActions & (int)action) == (int)action) return;
+            _activeSlot.tutorialActions |= (int)action;
+            PersistSave();
+        }
+
+        public void HideTutorial() => RecordTutorialAction(TutorialAction.All);
+
         public void PersistSave()
         {
+            if (_runReady && PlayerAlive)
+            {
+                var checkpoint = new RunCheckpoint
+                {
+                    seed = _chamberSeed, weaponCursor = _weaponCursor,
+                    usesLevelLibrary = _library != null && _library.IsUsable,
+                    playerPosition = PlayerPosition, health = _player.Health
+                };
+                _combat.Capture(checkpoint);
+                _activeSlot.run = checkpoint;
+            }
             _save.marketJson = _market.Serialize();
             _save.Save();
+            _nextCheckpoint = Time.unscaledTime + 5f;
+        }
+
+        void RestoreRun(RunCheckpoint checkpoint)
+        {
+            BuildChamber(checkpoint.seed, checkpoint.wave);
+            SpawnPlayer(checkpoint.playerPosition);
+            _player.RestoreHealth(checkpoint.health);
+            _combat.Restore(checkpoint);
+            _weaponCursor = checkpoint.weaponCursor;
+            foreach (var pickup in checkpoint.pickups)
+                if (pickup.remainingLifetime > 0f)
+                    DropPickup(pickup.position, pickup.kind, pickup.artifact)
+                        .RestoreLifetime(pickup.remainingLifetime);
+            if (_combat.EnemyCount == 0) _world.ExitDoor?.Unlock();
+            _runReady = true;
+            SetMode(GameMode.InDungeon);
+            SetPauseOpen(true);
+            Camera.main?.GetComponent<PlayerCenteredCamera>()?.CenterNow();
         }
 
         void Toast(string message) => _ui.Toast(message);
@@ -715,7 +859,30 @@ namespace DungeonDash
 
         void OnDestroy() => _worldBuilder?.ReleaseTiles();
 
-        void OnApplicationQuit() => PersistSave();
+        void OnApplicationPause(bool paused)
+        {
+            if (paused) SuspendSession();
+            else Cosmetics?.RefreshPurchases();
+        }
+
+        void OnApplicationFocus(bool focused)
+        {
+            if (!focused && Application.isMobilePlatform) SuspendSession();
+        }
+
+        void SuspendSession()
+        {
+            if (_save == null || _market == null) return;
+            TouchControls?.ResetInput();
+            PersistSave();
+            if (_transitioning) _pauseAfterTransition = true;
+            else SetPauseOpen(true);
+        }
+
+        void OnApplicationQuit()
+        {
+            if (_save != null && _market != null) PersistSave();
+        }
 
 
         void StartRun(GameCatalog.CharacterSkin skin)
@@ -741,6 +908,8 @@ namespace DungeonDash
                     .FirstOrDefault(x => x.id == character.Substring(characterArgument.Length));
                 if (skin != null) StartRun(skin);
             }
+            else if (arguments.Contains("--qa-resume") && _save.ActiveSlotOrNull != null)
+                ContinueSlot(_save.activeSlot);
 
             string view = arguments
                 .FirstOrDefault(x => x.StartsWith(viewArgument, StringComparison.Ordinal))?
@@ -753,19 +922,25 @@ namespace DungeonDash
                 case "picker":
                     OpenHeroPicker();
                     break;
+                case "cosmetics":
+                    if (WorldRunning) SetPauseOpen(true);
+                    OpenCosmetics();
+                    break;
                 case "hub" when _activeSlot != null:
                     BuildHub();
                     break;
                 case "game-over" when WorldRunning:
                     GameOver();
                     break;
-                case "door" or "transition" or "next-room" when CombatActive:
+                case "door" or "transition" or "next-room" or "encounter" when CombatActive:
                     PrepareDoorQa();
                     if (view != "door") BeginNextRoomTransition();
                     break;
             }
 
             if (arguments.Contains("--qa-inventory") && WorldRunning) SetInventoryOpen(true);
+            if (arguments.Contains("--qa-tutorial") && _activeSlot != null)
+                _activeSlot.tutorialActions = 0;
             if (arguments.Contains("--qa-market") && WorldRunning)
             {
                 OpenMarketOverlay();
@@ -795,16 +970,31 @@ namespace DungeonDash
             {
                 while (_transitioning && _transitionAmount < 0.74f) yield return null;
             }
-            else if (view == "next-room")
+            else if (view == "next-room" || view == "encounter")
             {
                 while (_transitioning) yield return null;
-                yield return new WaitForSecondsRealtime(delay);
+                if (view == "encounter")
+                {
+                    var enemies = _combat.ActorRoot.GetComponentsInChildren<EnemyNavigator>();
+                    var caster = enemies.FirstOrDefault(enemy => enemy.IsRanged);
+                    var melee = enemies.FirstOrDefault(enemy => !enemy.IsRanged);
+                    if (caster != null && ProjectilePathClear(PlayerPosition, PlayerPosition + Vector2.right * 3f))
+                        caster.transform.position = PlayerPosition + Vector2.right * 3f;
+                    if (melee != null && ProjectilePathClear(PlayerPosition, PlayerPosition + Vector2.up * 0.65f))
+                        melee.transform.position = PlayerPosition + Vector2.up * 0.65f;
+                }
+                yield return new WaitForSecondsRealtime(view == "encounter" ? 0.5f : delay);
             }
             else
             {
                 yield return new WaitForSecondsRealtime(delay);
             }
             yield return new WaitForEndOfFrame();
+            if (_activeSlot != null)
+            {
+                PersistSave();
+                Debug.Log($"[DungeonDash] QA checkpoint: {JsonUtility.ToJson(_activeSlot.run)}");
+            }
             ScreenCapture.CaptureScreenshot(path);
             Debug.Log($"[DungeonDash] QA screenshot: {path}");
             yield return new WaitForSecondsRealtime(0.5f);

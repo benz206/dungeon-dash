@@ -136,7 +136,7 @@ namespace DungeonDashTests
                 {
                     var cell = Vector2Int.RoundToInt(anchor);
                     Assert.That(layout.Walkable, Does.Contain(cell), $"seed {seed} spawn anchor is not floor");
-                    Assert.That(plan.BlockedCells, Does.Not.Contain(cell),
+                    Assert.That(plan.BlockedCells, Has.No.Member(cell),
                         $"seed {seed} spawn anchor sits inside a solid prop");
                 }
 
@@ -144,8 +144,8 @@ namespace DungeonDashTests
                 {
                     var cell = Vector2Int.RoundToInt(prop.Position - prop.Definition.offset);
                     Assert.That(layout.Walkable, Does.Contain(cell), $"seed {seed} prop is inside a wall");
-                    Assert.That(layout.Corridors, Does.Not.Contain(cell), $"seed {seed} prop blocks a corridor");
-                    Assert.That(layout.Doorway, Does.Not.Contain(cell), $"seed {seed} prop blocks the exit");
+                    Assert.That(layout.Corridors, Has.No.Member(cell), $"seed {seed} prop blocks a corridor");
+                    Assert.That(layout.Doorway, Has.No.Member(cell), $"seed {seed} prop blocks the exit");
                 }
 
                 Assert.That(plan.Props.Select(prop => prop.Position).Distinct().Count(),

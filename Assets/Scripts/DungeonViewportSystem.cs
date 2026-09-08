@@ -112,6 +112,16 @@ namespace DungeonDash
             minimapRect.anchoredPosition = new Vector2(24f, 24f);
             minimapRect.sizeDelta = new Vector2(136f, 136f);
 
+            if (MobileControls.Enabled)
+            {
+                var scaler = canvasObject.AddComponent<CanvasScaler>();
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                var safeArea = UiKit.Node("Safe Area", canvasObject.transform);
+                safeArea.gameObject.AddComponent<SafeAreaLayout>().Initialize(scaler);
+                minimapRect.SetParent(safeArea, false);
+                UiKit.Corner(minimapRect, Vector2.one, new Vector2(-24f, -104f), new Vector2(128f, 128f));
+            }
+
             _circleTexture = CreateCircleTexture(128, false);
             var maskImage = _minimap.GetComponent<Image>();
             maskImage.sprite = Sprite.Create(_circleTexture, new Rect(0, 0, 128, 128), Vector2.one * 0.5f);

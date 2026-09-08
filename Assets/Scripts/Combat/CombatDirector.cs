@@ -70,21 +70,55 @@ namespace DungeonDash
             Wave++;
             int count = Mathf.Min(BaseWaveSize + Wave * WaveSizeStep, MaxWaveSize);
             WaveSize = count;
-            float speed = BaseEnemySpeed + Mathf.Min(Wave * 0.04f, MaxEnemySpeedBonus);
             int health = 11 + Wave * 4;
 
             for (int i = 0; i < count; i++)
             {
                 var skin = _catalog.Catalog.enemies[_enemyCursor++ % _catalog.Catalog.enemies.Length];
+                if (Wave >= 2 && i % 4 == 0)
+                    skin = _catalog.Enemy(Wave % 2 == 0 ? "necro" : "orc_shaman") ?? skin;
                 var position = _spawnAnchors[(i * 7 + Wave * 3) % _spawnAnchors.Count];
-                var actorObject = WorldBuilder.CreateSprite(skin.id, skin.idle[0], position, 8, ActorRoot);
-                actorObject.AddComponent<EnemyNavigator>().Setup(_game, _navField, speed);
-                var enemy = actorObject.AddComponent<EnemyActor>();
-                enemy.Setup(_game, skin, health);
-                _enemies.Add(enemy);
+                SpawnEnemy(skin, position, health);
             }
 
             GameAudio.Play("wave_start", 0.7f);
+        }
+
+        void SpawnEnemy(GameCatalog.EnemySkin skin, Vector2 position, int health)
+        {
+            float speed = BaseEnemySpeed + Mathf.Min(Wave * 0.04f, MaxEnemySpeedBonus);
+            var actorObject = WorldBuilder.CreateSprite(skin.id, skin.idle[0], position, 8, ActorRoot);
+            bool ranged = Wave >= 2 && skin.id is "necro" or "orc_shaman";
+            actorObject.AddComponent<EnemyNavigator>().Setup(_game, _navField, speed, ranged);
+            var enemy = actorObject.AddComponent<EnemyActor>();
+            enemy.Setup(_game, skin, health);
+            _enemies.Add(enemy);
+        }
+
+        public void Capture(RunCheckpoint checkpoint)
+        {
+            checkpoint.wave = Wave;
+            checkpoint.kills = Kills;
+            checkpoint.waveSize = WaveSize;
+            checkpoint.enemyCursor = _enemyCursor;
+            foreach (var enemy in _enemies) checkpoint.enemies.Add(enemy.Capture());
+            if (_actorRoot == null) return;
+            foreach (var pickup in _actorRoot.GetComponentsInChildren<PickupActor>())
+            {
+                var state = pickup.Capture();
+                if (state != null) checkpoint.pickups.Add(state);
+            }
+        }
+
+        public void Restore(RunCheckpoint checkpoint)
+        {
+            Wave = checkpoint.wave;
+            Kills = checkpoint.kills;
+            WaveSize = checkpoint.waveSize;
+            _enemyCursor = checkpoint.enemyCursor;
+            _clearPending = checkpoint.enemies.Count == 0;
+            foreach (var enemy in checkpoint.enemies)
+                SpawnEnemy(_catalog.Enemy(enemy.skinId), enemy.position, enemy.health);
         }
 
         public void Defeat(EnemyActor enemy)
@@ -109,6 +143,8 @@ namespace DungeonDash
             for (int i = _enemies.Count - 1; i >= 0; i--)
                 if (_enemies[i] != null) _enemies[i].TakeDamage(9999);
         }
+
+        public bool ProjectilePathClear(Vector2 from, Vector2 to) => _navField.HasLineOfSight(from, to);
 
         public EnemyActor ProjectileTarget(Vector2 position)
         {

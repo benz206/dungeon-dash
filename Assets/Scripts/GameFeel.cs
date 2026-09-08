@@ -49,6 +49,13 @@ namespace DungeonDash
             _instance._hitStopTimer = duration;
         }
 
+        public static void EndHitStop()
+        {
+            if (_instance == null || !_instance._hitStopActive) return;
+            _instance._hitStopActive = false;
+            if (Mathf.Approximately(Time.timeScale, HitStopDip)) Time.timeScale = 1f;
+        }
+
         void Update()
         {
             if (_hitStopActive)

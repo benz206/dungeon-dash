@@ -5,9 +5,7 @@ using UnityEngine.InputSystem;
 
 namespace DungeonDash
 {
-    /// A hub portal: shows a "Press E" prompt when the player stands near it and
-    /// invokes a callback on E. Proximity is a simple distance check against the
-    /// player position — no physics triggers needed.
+    /// A nearby destination activated by keyboard or the touch interaction button.
     public sealed class InteractionZone : MonoBehaviour
     {
         const float Radius = 1.1f;
@@ -42,6 +40,12 @@ namespace DungeonDash
             if (!PlayerInRange) return;
             var keyboard = Keyboard.current;
             if (keyboard == null || !keyboard.eKey.wasPressedThisFrame) return;
+            Interact();
+        }
+
+        public void Interact()
+        {
+            if (!PlayerInRange) return;
             GameAudio.Play("ui_click", 0.5f);
             _onInteract?.Invoke();
         }

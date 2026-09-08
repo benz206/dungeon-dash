@@ -17,6 +17,20 @@ namespace DungeonDash
         Sprite[] _frames;
         SpriteRenderer _renderer;
         float _spawnTime;
+        bool _consumed;
+
+        public RunCheckpoint.Pickup Capture()
+        {
+            float remaining = Lifetime - (Time.time - _spawnTime);
+            return _consumed || remaining <= 0f ? null : new RunCheckpoint.Pickup
+            {
+                kind = _kind, artifact = _artifact, position = transform.position,
+                remainingLifetime = remaining
+            };
+        }
+
+        public void RestoreLifetime(float remaining) =>
+            _spawnTime = Time.time - (Lifetime - Mathf.Clamp(remaining, 0f, Lifetime));
 
         public void Setup(DungeonGame game, PickupKind kind, Artifact artifact, Sprite[] frames = null)
         {
@@ -44,6 +58,7 @@ namespace DungeonDash
             transform.localScale = Vector3.one * (1f + Mathf.Sin(Time.time * 5f) * 0.07f);
             if (((Vector2)transform.position - _game.PlayerPosition).sqrMagnitude < PickupRadius * PickupRadius)
             {
+                _consumed = true;
                 if (_kind == PickupKind.Coin) { PixelBurst.CoinSparkle(transform.position); GameAudio.Play("coin", 0.5f); }
                 else if (_kind == PickupKind.Potion) { PixelBurst.PotionGlint(transform.position); GameAudio.Play("potion", 0.5f); }
                 _game.Collect(_kind, _artifact);

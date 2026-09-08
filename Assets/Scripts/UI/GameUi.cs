@@ -18,6 +18,8 @@ namespace DungeonDash
 
         DungeonGame _game;
         Canvas _canvas;
+        RectTransform _safeArea;
+        MobileControls _touchControls;
         RectTransform _screenLayer;
         RectTransform _overlayLayer;
         HudView _hud;
@@ -31,6 +33,7 @@ namespace DungeonDash
         float _toastUntil;
 
         public HudView Hud => _hud;
+        public MobileControls TouchControls => _touchControls;
 
         public void Initialize(DungeonGame game)
         {
@@ -71,7 +74,10 @@ namespace DungeonDash
             _backdrop = backdropNode.gameObject.AddComponent<TitleBackdrop>();
             _backdrop.Initialize(_game.Catalog);
 
-            var hudLayer = UiKit.Node("HUD Layer", _canvas.transform);
+            _safeArea = UiKit.Node("Safe Area", _canvas.transform);
+            _safeArea.gameObject.AddComponent<SafeAreaLayout>().Initialize(_canvas.GetComponent<CanvasScaler>());
+
+            var hudLayer = UiKit.Node("HUD Layer", _safeArea);
             UiKit.Stretch(hudLayer, 0f, 0f, 0f, 0f);
             _hud = hudLayer.gameObject.AddComponent<HudView>();
             _hud.Initialize(_game);
@@ -82,8 +88,17 @@ namespace DungeonDash
             var damageNode = UiKit.Node("Damage Numbers", _canvas.transform);
             damageNode.gameObject.AddComponent<DamageNumberLayer>().Initialize(_canvas);
 
-            _screenLayer = UiKit.Node("Screens", _canvas.transform);
+            if (MobileControls.Enabled)
+            {
+                var controls = UiKit.Node("Touch Controls", _safeArea);
+                _touchControls = controls.gameObject.AddComponent<MobileControls>();
+                _touchControls.Initialize(_game);
+                controls.gameObject.SetActive(false);
+            }
+
+            _screenLayer = UiKit.Node("Screens", _safeArea);
             UiKit.Stretch(_screenLayer, 0f, 0f, 0f, 0f);
+            _safeArea.SetAsLastSibling();
 
             _overlayLayer = UiKit.Node("Overlay", _canvas.transform);
             UiKit.Stretch(_overlayLayer, 0f, 0f, 0f, 0f);
@@ -97,6 +112,7 @@ namespace DungeonDash
             Register(GameMode.Market, Create<MarketScreen>("Market"));
             Register(GameMode.Paused, Create<PauseScreen>("Pause"));
             Register(GameMode.GameOver, Create<GameOverScreen>("Game Over"));
+            Register(GameMode.Cosmetics, Create<CosmeticScreen>("Cosmetics"));
             HeroPicker = Create<HeroPickerScreen>("Hero Picker");
         }
 
@@ -144,7 +160,7 @@ namespace DungeonDash
 
         void BuildToast()
         {
-            _toastRoot = UiKit.Node("Toast", _overlayLayer);
+            _toastRoot = UiKit.Node("Toast", _safeArea);
             UiKit.Corner(_toastRoot, new Vector2(0.5f, 1f), new Vector2(0f, -124f), new Vector2(620f, 46f));
             _toastGroup = UiKit.Group(_toastRoot);
             var panel = UiKit.Panel("Frame", _toastRoot);
@@ -165,18 +181,30 @@ namespace DungeonDash
 
         public void SetMode(GameMode mode, bool heroPicker)
         {
+            if (mode is GameMode.GameOver or GameMode.Paused or GameMode.StartScreen or GameMode.CharacterSelect)
+            {
+                _toastUntil = 0f;
+                _toastGroup.alpha = 0f;
+            }
+            if (_touchControls != null)
+            {
+                _touchControls.ResetInput();
+                _touchControls.gameObject.SetActive(mode is GameMode.HomeHub or GameMode.InDungeon);
+            }
             foreach (var screen in _all) screen.Hide();
             if (heroPicker) HeroPicker.Show();
             else if (_screens.TryGetValue(mode, out var target)) target.Show();
 
-            bool titleScene = mode is GameMode.StartScreen or GameMode.CharacterSelect;
+            bool titleScene = mode is GameMode.StartScreen or GameMode.CharacterSelect ||
+                (mode == GameMode.Cosmetics && _game.CosmeticsFromTitle);
             if (_backdrop.gameObject.activeSelf != titleScene) _backdrop.gameObject.SetActive(titleScene);
 
             bool worldVisible = mode is GameMode.HomeHub or GameMode.InDungeon or GameMode.Inventory
                 or GameMode.Market or GameMode.Paused or GameMode.GameOver;
+            worldVisible |= mode == GameMode.Cosmetics && !_game.CosmeticsFromTitle;
             if (_hud.gameObject.activeSelf != worldVisible) _hud.gameObject.SetActive(worldVisible);
             if (!worldVisible) return;
-            _hud.SetDimmed(mode is GameMode.Inventory or GameMode.Market or GameMode.Paused or GameMode.GameOver);
+            _hud.SetDimmed(mode is GameMode.Inventory or GameMode.Market or GameMode.Paused or GameMode.GameOver or GameMode.Cosmetics);
             _hud.Refresh();
         }
 
@@ -197,7 +225,9 @@ namespace DungeonDash
             {
                 float progress = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((amount - i * BandStagger) / span));
                 var rect = _bands[i].rectTransform;
-                rect.sizeDelta = new Vector2(UiKit.Reference.x * progress, rect.sizeDelta.y);
+                float height = _transitionRoot.rect.height / TransitionBands;
+                rect.anchoredPosition = new Vector2(0f, -i * height);
+                rect.sizeDelta = new Vector2(_transitionRoot.rect.width * progress, height + 1f);
             }
 
             _transitionLabel.text = label;

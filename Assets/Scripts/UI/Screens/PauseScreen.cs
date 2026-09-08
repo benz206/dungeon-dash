@@ -66,6 +66,10 @@ namespace DungeonDash
             var up = UiKit.PushButton("Up", volumePanel.transform, "+", ButtonTone.Ghost,
                 () => Change(1), 18);
             UiKit.Place(up.Rect, 158f, 8f, 46f, 46f);
+
+            var styles = UiKit.PushButton("Styles", dialog.Body, "COSMETIC STYLES", ButtonTone.Ghost,
+                Game.OpenCosmetics, 15);
+            UiKit.Place(styles.Rect, 0f, 238f, 664f, 56f);
         }
 
         void Change(int direction)
@@ -79,8 +83,8 @@ namespace DungeonDash
             var skin = Game.ActiveSkin;
             UiKit.SetIcon(_portrait, skin != null && skin.idle.Length > 0 ? skin.idle[0] : null);
             _heroName.text = skin == null ? string.Empty : HeroNames.Name(skin.id).ToUpperInvariant();
-            _runLine.text = Game.Mode == GameMode.HomeHub
-                ? "HOME BASE  ·  SAFE ROOM"
+            _runLine.text = Game.CurrentRoom == 0
+                ? $"{Game.GuildRank}  ·  BEST CLEAR {Game.BestChamberCleared:00}"
                 : $"CHAMBER {Game.CurrentRoom:00}   ·   {Game.Kills} DEFEATED";
             _volume.text = $"{Game.VolumeStep * 25}%";
 

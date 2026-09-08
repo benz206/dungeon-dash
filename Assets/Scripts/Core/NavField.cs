@@ -28,6 +28,35 @@ namespace DungeonDash
             _nextRebuild = float.NegativeInfinity;
         }
 
+        public bool HasLineOfSight(Vector2 from, Vector2 to)
+        {
+            var cell = Vector2Int.FloorToInt(from + Vector2.one * 0.5f);
+            var end = Vector2Int.FloorToInt(to + Vector2.one * 0.5f);
+            if (!_walkable.Contains(cell)) return false;
+            Vector2 delta = to - from;
+            int stepX = delta.x > 0f ? 1 : -1, stepY = delta.y > 0f ? 1 : -1;
+            float dx = delta.x == 0f ? float.PositiveInfinity : Mathf.Abs(1f / delta.x);
+            float dy = delta.y == 0f ? float.PositiveInfinity : Mathf.Abs(1f / delta.y);
+            float nextX = delta.x == 0f ? float.PositiveInfinity : (cell.x + stepX * 0.5f - from.x) / delta.x;
+            float nextY = delta.y == 0f ? float.PositiveInfinity : (cell.y + stepY * 0.5f - from.y) / delta.y;
+            while (cell != end)
+            {
+                // At an exact corner, both adjacent cells must be open.
+                if (Mathf.Abs(nextX - nextY) < 0.000001f)
+                {
+                    if (!_walkable.Contains(cell + new Vector2Int(stepX, 0)) ||
+                        !_walkable.Contains(cell + new Vector2Int(0, stepY))) return false;
+                    cell += new Vector2Int(stepX, stepY);
+                    nextX += dx;
+                    nextY += dy;
+                }
+                else if (nextX < nextY) { cell.x += stepX; nextX += dx; }
+                else { cell.y += stepY; nextY += dy; }
+                if (!_walkable.Contains(cell)) return false;
+            }
+            return true;
+        }
+
         public void EnsureFresh(Vector2 target)
         {
             if (Time.time < _nextRebuild) return;

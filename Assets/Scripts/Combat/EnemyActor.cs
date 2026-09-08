@@ -16,6 +16,11 @@ namespace DungeonDash
         float _invulnerableUntil;
         float _spawnTime;
 
+        public RunCheckpoint.Enemy Capture() => new()
+        {
+            skinId = _skin.id, position = transform.position, health = _health
+        };
+
         public void Setup(DungeonGame game, GameCatalog.EnemySkin skin, int health)
         {
             _game = game;
@@ -64,6 +69,7 @@ namespace DungeonDash
             GameAudio.Play(critical ? "crit_impact" : "hit_impact", 0.8f);
             if (critical) GameFeel.Shake(0.22f);
             if (_health > 0) return;
+            if (_navigator != null) _navigator.enabled = false;
             _game.EnemyDied(this);
             PixelBurst.EnemyDeathPuff(transform.position, _skin.id);
             GameAudio.Play("enemy_die", 0.8f);

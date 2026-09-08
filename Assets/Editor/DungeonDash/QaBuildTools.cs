@@ -8,6 +8,7 @@ namespace DungeonDash.EditorTools
         [MenuItem("Tools/Dungeon Dash/Build QA Player")]
         public static void BuildQaPlayer()
         {
+            BrandingTools.Apply();
             const string path = "Builds/QA/DungeonDash.app";
             var report = BuildPipeline.BuildPlayer(
                 new[] { "Assets/Scenes/SampleScene.unity" },

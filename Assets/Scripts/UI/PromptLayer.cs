@@ -72,6 +72,7 @@ namespace DungeonDash
                     if (!prompt.Root.gameObject.activeSelf) prompt.Root.gameObject.SetActive(true);
                     prompt.Root.anchoredPosition = new Vector2(screen.x / scale - Width * 0.5f, screen.y / scale);
                     prompt.Label.text = zone.Label;
+                    prompt.Key.text = MobileControls.Enabled ? ">" : "E";
                     prompt.Label.color = UiPalette.Cream.Alpha(near ? 1f : 0.62f);
                     prompt.Frame.color = near ? UiPalette.Gold : UiPalette.PanelLight.Alpha(0.5f);
                     prompt.KeyCap.color = near ? UiPalette.Gold : UiPalette.Muted.Alpha(0.5f);

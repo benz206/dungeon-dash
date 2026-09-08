@@ -1,6 +1,7 @@
 # Dungeon Dash
 
-Dungeon Dash is a small PC arena roguelite built with Unity 6. It takes some
+Dungeon Dash is an arena roguelite built with Unity 6, being prepared for a free
+iPhone release with optional cosmetic purchases. Desktop play remains supported. It takes some
 inspiration from *Soul Knight*: pick a hero, fight through increasingly busy
 waves, and collect weapons with randomly rolled stats. Artifacts can also be
 listed on a shared market for other players to buy.
@@ -13,14 +14,62 @@ missing, run `Tools > Dungeon Dash > Generate Everything` before starting. That
 also packs the sprite atlases, without which every tile costs its own draw call.
 Then open `Assets/Scenes/SampleScene.unity` and press Play.
 
-### Controls
+### Mobile play and iPhone exports
+
+On iPhone, use the left pad to move, the right pad to aim and fire, and the Dash
+button to evade. An interaction button appears beside usable doors and hub
+destinations. Vault, Market, and Pause are available from the HUD. UI respects
+screen safe areas and the game runs in landscape orientation.
+
+To preview touch controls in a desktop player, launch it with `--touch-controls`.
+The existing QA screenshot flags can be combined with this flag. Use
+`--qa-view=cosmetics` to inspect the collection screen.
+Use `--qa-tutorial` to show the first-run guide, or `--qa-resume` without
+`--qa-character` to restore the last QA checkpoint in a new player process.
+Editor play mode, batch tests, and players launched with `--qa-*` flags use a separate save key so
+future automated runs do not change normal player progress.
+
+Install iOS Build Support for Unity 6000.5.3f1, then use **Tools > Dungeon Dash >
+Export iPhone Player** or **Export iPhone Simulator**. Set the registered iOS
+Bundle ID before a device export. The simulator exporter targets Apple Silicon.
+
+App suspension saves a run checkpoint and keeps gameplay paused until the player
+resumes. Continue restores the chamber, hero health, remaining enemies, uncollected
+loot, and unlocked exit alongside inventory and coins. Combat also checkpoints every
+five seconds and after rewards, damage, and room changes. A hard termination resumes
+the last checkpoint; transient attacks and cooldowns restart. Defeat or abandoning a
+run clears the checkpoint. Checkpoints are local to the device.
+
+New delvers receive a guide that advances through movement, attacking, dashing,
+clearing a chamber, and using its exit. HIDE TIPS dismisses it permanently for that
+save slot. The included level library enables four themes and nine room templates.
+
+Melee enemies warn with an orange ring before striking. From chamber two, casters
+mark an aim line and fire a slower, dodgeable bolt at the hero's earlier position.
+Walls block both enemy bolts and player projectiles. Pausing freezes attacks, and
+defeating or interrupting an enemy cancels its pending wind-up.
+
+Each delver keeps a best cleared chamber and lifetime defeat count. Clear chambers
+3, 6, and 10 to earn SCOUT, WARDEN, and CHAMPION ranks. The hub and run summary show
+the next target. Ranks are earned through play and saved with the character.
+`--qa-view=encounter` stages the second chamber's attack warnings for visual QA.
+
+The Styles screen, accessible from the title and pause menus, previews the optional
+Guild Collection. Purchases use Unity IAP and Apple product
+`dungeon_dash.guild_cosmetics`; desktop previews cannot grant purchases. See
+[COMMERCIAL_RELEASE.md](COMMERCIAL_RELEASE.md) for configuration, launch gates,
+and remaining product work.
+
+### Desktop controls
 
 - `WASD` — move
 - Mouse — aim and fire
 - `Space` — fire toward the cursor
 - `I` — open the artifact inventory
 - `M` — open the artifact market
-- `Esc` — close the current menu
+- Right mouse button — dash
+- `E` — interact with a nearby destination
+- `Esc` — pause or close the current menu
 
 There are six playable hero classes and eleven appearance variants. Weapons
 drop from a round-robin pool, so every imported weapon gets a turn instead of

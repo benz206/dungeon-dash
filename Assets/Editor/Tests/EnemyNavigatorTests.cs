@@ -47,7 +47,7 @@ namespace DungeonDashTests
         }
 
         [UnityTest]
-        public IEnumerator EnemyInRange_DamagesThePlayer()
+        public IEnumerator EnemyInRange_WarnsBeforeDamagingThePlayer()
         {
             yield return new EnterPlayMode();
 
@@ -61,7 +61,9 @@ namespace DungeonDashTests
             int startingHealth = player.Health;
             enemy.transform.position = player.transform.position + Vector3.right * 0.5f;
 
-            yield return new WaitForSeconds(0.1f);
+            yield return EnemyAttackTests.Advance(0.1f);
+            Assert.That(player.Health, Is.EqualTo(startingHealth), "Contact must not deal instant damage.");
+            yield return EnemyAttackTests.Advance(1.3f);
 
             Assert.That(player.Health, Is.LessThan(startingHealth));
             yield return new ExitPlayMode();

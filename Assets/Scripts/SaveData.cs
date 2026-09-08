@@ -14,19 +14,33 @@ namespace DungeonDash
             public int coins = 25;
             public string equippedId;
             public List<Artifact> inventory = new();
+            public RunCheckpoint run;
+            public int tutorialActions;
+            public int bestChamberCleared;
+            public int lifetimeKills;
+
+            public string GuildRank => bestChamberCleared >= 10 ? "CHAMPION"
+                : bestChamberCleared >= 6 ? "WARDEN" : bestChamberCleared >= 3 ? "SCOUT" : "DELVER";
+            public string NextGoal => bestChamberCleared >= 10 ? $"BEAT YOUR RECORD: {bestChamberCleared + 1:00}"
+                : bestChamberCleared >= 6 ? "CLEAR 10 · EARN CHAMPION"
+                : bestChamberCleared >= 3 ? "CLEAR 06 · EARN WARDEN" : "CLEAR 03 · EARN SCOUT";
         }
 
         public const int MaxSlots = 3;
 
         public List<CharacterSlot> slots = new();
         public int activeSlot;
+        public bool guildCosmeticsOwned;
+        public int cosmeticStyle;
 
         // Market state is shared across characters, not per-slot.
         public string marketJson;
         public int marketPendingCoinDelta;
         public bool marketAccountInitialized;
 
-        const string Key = "DungeonDash.Save.v2";
+        static readonly string Key = Application.isEditor || Application.isBatchMode ||
+            Array.Exists(Environment.GetCommandLineArgs(), argument => argument.StartsWith("--qa-", StringComparison.Ordinal))
+                ? "DungeonDash.QA.Save.v2" : "DungeonDash.Save.v2";
 
         public static SaveData Load()
         {
@@ -35,7 +49,14 @@ namespace DungeonDash
             var json = PlayerPrefs.GetString(Key, string.Empty);
             var data = string.IsNullOrEmpty(json) ? new SaveData() : JsonUtility.FromJson<SaveData>(json);
             data.slots ??= new List<CharacterSlot>();
-            foreach (var slot in data.slots) slot.inventory ??= new List<Artifact>();
+            foreach (var slot in data.slots)
+            {
+                slot.inventory ??= new List<Artifact>();
+                if (slot.run?.CanResume != true) continue;
+                int knownClear = slot.run.wave - (slot.run.enemies.Count > 0 ? 1 : 0);
+                slot.bestChamberCleared = Math.Max(slot.bestChamberCleared, knownClear);
+                slot.lifetimeKills = Math.Max(slot.lifetimeKills, slot.run.kills);
+            }
             return data;
         }
 

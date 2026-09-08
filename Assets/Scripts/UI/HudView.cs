@@ -23,6 +23,8 @@ namespace DungeonDash
         UiButton _vaultButton;
         UiButton _marketButton;
         Text _hint;
+        RectTransform _guide;
+        Text _guideText;
         CanvasGroup _group;
         float _clearAmount;
         int _lastCoins = -1;
@@ -42,6 +44,7 @@ namespace DungeonDash
             BuildChamberBanner(root);
             BuildMenuButtons(root);
             BuildHint(root);
+            BuildGuide(root);
             Refresh();
         }
 
@@ -104,13 +107,23 @@ namespace DungeonDash
 
         void BuildMenuButtons(RectTransform parent)
         {
-            _vaultButton = UiKit.PushButton("Vault", parent, "VAULT  [I]", ButtonTone.Primary,
+            _vaultButton = UiKit.PushButton("Vault", parent, MobileControls.Enabled ? "VAULT" : "VAULT  [I]", ButtonTone.Primary,
                 () => _game.SetInventoryOpen(true));
             UiKit.Corner(_vaultButton.Rect, new Vector2(1f, 1f), new Vector2(-186f, -20f), new Vector2(158f, 48f));
 
-            _marketButton = UiKit.PushButton("Market", parent, "MARKET  [M]", ButtonTone.Primary,
+            _marketButton = UiKit.PushButton("Market", parent, MobileControls.Enabled ? "MARKET" : "MARKET  [M]", ButtonTone.Primary,
                 _game.OpenMarketOverlay);
             UiKit.Corner(_marketButton.Rect, new Vector2(1f, 1f), new Vector2(-20f, -20f), new Vector2(158f, 48f));
+
+            var pause = UiKit.PushButton("Pause", parent, "PAUSE", ButtonTone.Primary,
+                () => _game.SetPauseOpen(true), 14);
+            UiKit.Corner(pause.Rect, new Vector2(1f, 1f), new Vector2(-20f, -78f), new Vector2(158f, 48f));
+            if (MobileControls.Enabled)
+            {
+                UiKit.Corner(_vaultButton.Rect, Vector2.one, new Vector2(-260f, -20f), new Vector2(112f, 64f));
+                UiKit.Corner(_marketButton.Rect, Vector2.one, new Vector2(-140f, -20f), new Vector2(112f, 64f));
+                UiKit.Corner(pause.Rect, Vector2.one, new Vector2(-20f, -20f), new Vector2(112f, 64f));
+            }
         }
 
         void BuildHint(RectTransform parent)
@@ -126,6 +139,19 @@ namespace DungeonDash
 
         public void SetDimmed(bool dimmed) => _group.alpha = dimmed ? 0.35f : 1f;
 
+        void BuildGuide(RectTransform parent)
+        {
+            _guide = UiKit.Panel("First Run Guide", parent).rectTransform;
+            UiKit.Corner(_guide, new Vector2(0.5f, 0f), new Vector2(0f, 66f), new Vector2(600f, 86f));
+            var label = UiKit.Label("Title", _guide, "YOUR FIRST EXPEDITION", 15, UiPalette.Gold);
+            UiKit.Place(label.rectTransform, 16f, 10f, 440f, 20f);
+            _guideText = UiKit.Wrapped("Objective", _guide, string.Empty, 19, UiPalette.Cream);
+            UiKit.Place(_guideText.rectTransform, 16f, 32f, 446f, 46f);
+            var hide = UiKit.PushButton("Hide Tips", _guide, "HIDE TIPS", ButtonTone.Ghost,
+                _game.HideTutorial, 13);
+            UiKit.Place(hide.Rect, 480f, 12f, 108f, 62f);
+        }
+
         public void Refresh()
         {
             var skin = _game.ActiveSkin;
@@ -140,6 +166,9 @@ namespace DungeonDash
 
         public void Tick()
         {
+            string tutorial = _game.TutorialHint;
+            _guide.gameObject.SetActive(tutorial != null);
+            if (tutorial != null) _guideText.text = tutorial;
             var player = _game.Player;
             if (player != null && player.Health != _lastHealth)
             {
@@ -173,7 +202,7 @@ namespace DungeonDash
                 _chamberBar.color = inHub ? UiPalette.Steel : theme != null ? theme.accent : UiPalette.Crimson;
                 _chamberLabel.text = inHub ? "HOME BASE" : $"CHAMBER {_lastChamber:00}";
                 _chamberDetail.text = inHub
-                    ? "SAFE ROOM"
+                    ? _game.ProgressGoal
                     : theme != null ? theme.displayName.ToUpperInvariant() : $"{_lastKills} DEFEATED";
             }
 
@@ -182,7 +211,10 @@ namespace DungeonDash
             _clearBar.SetAmount(_clearAmount);
             _clearBar.Fill.color = _game.RoomExitUnlocked || inHub ? UiPalette.Verdant : UiPalette.Gold;
 
-            _hint.text = inHub
+            _hint.text = MobileControls.Enabled
+                ? (inHub ? "LEFT PAD TO MOVE  ·  APPROACH A DOOR TO INTERACT"
+                    : "LEFT PAD TO MOVE  ·  RIGHT PAD TO AIM + FIRE  ·  DASH TO EVADE")
+                : inHub
                 ? "WASD MOVE   ·   E INTERACT   ·   I VAULT   ·   M MARKET   ·   ESC PAUSE"
                 : "WASD MOVE   ·   LMB ATTACK   ·   RMB DASH   ·   E INTERACT   ·   ESC PAUSE";
         }

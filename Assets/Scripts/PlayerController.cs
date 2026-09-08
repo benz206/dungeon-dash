@@ -28,6 +28,8 @@ namespace DungeonDash
         const float DashDuration = 0.16f;
         const float DashCooldown = 0.75f;
 
+        public bool DashReady => Time.time >= _nextDash;
+
         public int Health { get; private set; }
         public int MaxHealth { get; private set; } = 10;
         public float DamageMod { get; private set; } = 1f;
@@ -71,7 +73,10 @@ namespace DungeonDash
                 return;
             }
 
-            var keyboard = Keyboard.current;
+            _move = Vector2.zero;
+            var touch = _game.TouchControls;
+            bool useTouch = MobileControls.Enabled && touch != null;
+            var keyboard = useTouch ? null : Keyboard.current;
             if (keyboard != null)
             {
                 _move = new Vector2(
@@ -80,7 +85,18 @@ namespace DungeonDash
                 _move = Vector2.ClampMagnitude(_move, 1f);
             }
 
-            var mouse = Mouse.current;
+            if (useTouch)
+            {
+                _move = touch.Move;
+                if (touch.Aim.sqrMagnitude > 0.01f)
+                {
+                    _aim = touch.Aim.normalized;
+                    TryAttack();
+                }
+                if (touch.ConsumeDash()) TryDash();
+            }
+
+            var mouse = useTouch ? null : Mouse.current;
             if (mouse != null)
             {
                 Vector3 world = Camera.main.ScreenToWorldPoint(mouse.position.ReadValue());
@@ -127,6 +143,7 @@ namespace DungeonDash
             _dashDirection = _move.sqrMagnitude > 0.01f ? _move.normalized : _aim;
             _dashUntil = Time.time + DashDuration;
             _nextDash = Time.time + DashCooldown;
+            _game.RecordTutorialAction(TutorialAction.Dash);
             PixelBurst.DashDust(transform.position, _dashDirection);
             GameAudio.Play("dash_whoosh", 0.6f);
         }
@@ -167,8 +184,11 @@ namespace DungeonDash
             GameFeel.Shake(0.4f);
             GameFeel.HitStop();
             if (Health == 0) _game.GameOver();
+            else _game.PersistSave();
         }
 
         public void Heal(int amount) => Health = Mathf.Min(MaxHealth, Health + amount);
+
+        public void RestoreHealth(int health) => Health = Mathf.Clamp(health, 1, MaxHealth);
     }
 }

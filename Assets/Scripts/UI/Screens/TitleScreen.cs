@@ -33,6 +33,18 @@ namespace DungeonDash
                 Game.OpenSlotSelect, 18);
             UiKit.Place(enter.Rect, 20f, 180f, 420f, 66f);
 
+            if (MobileControls.Enabled)
+            {
+                var collection = UiKit.PushButton("Collection", dialog.Body, "STYLES", ButtonTone.Primary,
+                    Game.OpenCosmetics, 18);
+                UiKit.Place(collection.Rect, 458f, 180f, 206f, 66f);
+                return;
+            }
+
+            var styles = UiKit.PushButton("Styles", dialog.HeaderActions, "STYLES", ButtonTone.Ghost,
+                Game.OpenCosmetics, 14);
+            UiKit.Corner(styles.Rect, new Vector2(1f, 0.5f), Vector2.zero, new Vector2(150f, 40f));
+
             var quit = UiKit.PushButton("Quit", dialog.Body, "QUIT", ButtonTone.Danger, Game.QuitGame, 18);
             UiKit.Place(quit.Rect, 458f, 180f, 206f, 66f);
         }

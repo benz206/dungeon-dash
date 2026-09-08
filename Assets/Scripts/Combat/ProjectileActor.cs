@@ -26,7 +26,13 @@ namespace DungeonDash
         void Update()
         {
             if (!_game.CombatActive) return;
-            transform.position += (Vector3)(_direction * (Speed * Time.deltaTime));
+            Vector2 next = (Vector2)transform.position + _direction * (Speed * Time.deltaTime);
+            if (!_game.ProjectilePathClear(transform.position, next))
+            {
+                Destroy(gameObject);
+                return;
+            }
+            transform.position = next;
             var target = _game.ProjectileTarget(transform.position);
             if (target != null)
             {

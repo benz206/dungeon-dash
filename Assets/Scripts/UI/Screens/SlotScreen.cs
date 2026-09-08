@@ -8,6 +8,9 @@ namespace DungeonDash
         const float CardGap = 22f;
 
         RectTransform _cards;
+        int _deleteIndex = -1;
+
+        void OnDisable() => _deleteIndex = -1;
 
         protected override void Build()
         {
@@ -72,13 +75,35 @@ namespace DungeonDash
                 UiPalette.Muted, TextAnchor.UpperCenter);
             UiKit.Place(stats.rectTransform, 0f, 238f, width, 22f);
 
+            var progress = UiKit.Label("Progress", card,
+                $"{slot.GuildRank} · BEST CLEAR {slot.bestChamberCleared:00}", 16,
+                UiPalette.Gold, TextAnchor.UpperCenter);
+            UiKit.Place(progress.rectTransform, 0f, 265f, width, 22f);
+
+            if (slot.run?.CanResume == true)
+            {
+                var checkpoint = UiKit.Label("Checkpoint", card, $"CHAMBER {slot.run.wave:00} SAVED", 16,
+                    UiPalette.Gold, TextAnchor.UpperCenter);
+                UiKit.Place(checkpoint.rectTransform, 0f, 291f, width, 22f);
+            }
+
             int captured = index;
-            var play = UiKit.PushButton("Continue", card, "CONTINUE", ButtonTone.Primary,
-                () => Game.ContinueSlot(captured), 16);
+            bool confirmingDelete = _deleteIndex == index;
+            var play = UiKit.PushButton("Continue", card, confirmingDelete ? "KEEP SAVE" :
+                slot.run?.CanResume == true ? "RESUME RUN" : "CONTINUE", ButtonTone.Primary,
+                () =>
+                {
+                    if (confirmingDelete) { _deleteIndex = -1; Refresh(); }
+                    else Game.ContinueSlot(captured);
+                }, 16);
             UiKit.Place(play.Rect, 24f, 322f, width - 48f, 50f);
 
-            var remove = UiKit.PushButton("Delete", card, "DELETE", ButtonTone.Danger,
-                () => Game.DeleteSlotAt(captured), 14);
+            var remove = UiKit.PushButton("Delete", card, confirmingDelete ? "DELETE FOREVER" : "DELETE", ButtonTone.Danger,
+                () =>
+                {
+                    if (confirmingDelete) { _deleteIndex = -1; Game.DeleteSlotAt(captured); }
+                    else { _deleteIndex = captured; Refresh(); }
+                }, 14);
             UiKit.Place(remove.Rect, 24f, 380f, width - 48f, 42f);
         }
     }

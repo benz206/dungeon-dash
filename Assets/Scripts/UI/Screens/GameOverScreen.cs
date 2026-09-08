@@ -11,20 +11,22 @@ namespace DungeonDash
         {
             UiKit.Shade("Shade", Root, new Color(0.10f, 0.01f, 0.02f, 0.8f));
 
-            var dialog = UiKit.Dialog(Root, "RUN ENDED", "THE DUNGEON KEEPS WHAT IT TAKES",
-                UiPalette.Crimson, 560f, 320f);
+            var dialog = UiKit.Dialog(Root, "RUN ENDED", "EVERY EXPEDITION LEAVES ITS MARK",
+                UiPalette.Crimson, 560f, 360f);
             PopTarget(dialog.Holder);
 
             _summary = UiKit.Wrapped("Summary", dialog.Body, string.Empty, 19, UiPalette.Cream,
                 TextAnchor.UpperCenter);
-            UiKit.Place(_summary.rectTransform, 20f, 14f, 484f, 92f);
+            UiKit.Place(_summary.rectTransform, 20f, 14f, 484f, 130f);
 
             var home = UiKit.PushButton("Home", dialog.Body, "RETURN TO HOME BASE", ButtonTone.Danger,
                 Game.ReturnToHub, 17);
-            UiKit.Place(home.Rect, 60f, 130f, 404f, 66f);
+            UiKit.Place(home.Rect, 60f, 168f, 404f, 66f);
         }
 
         public override void Refresh() => _summary.text =
-            $"Reached chamber {Game.CurrentRoom} with {Game.Kills} kills.\nArtifacts and coins are saved.";
+            $"Reached chamber {Game.CurrentRoom} · {Game.Kills} defeated\n" +
+            $"{Game.GuildRank} · BEST CLEAR {Game.BestChamberCleared:00}\n" +
+            $"{Game.ProgressGoal}\n{Game.LifetimeKills} lifetime defeats\nArtifacts and coins are saved.";
     }
 }
